@@ -1,0 +1,16 @@
+node_modules
+dist
+.env
+pnpm-lock.yaml
+*.log
+.DS_Store
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# IDEs
+.vscode/
+.idea/
