@@ -57,5 +57,34 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT || 3000);
   console.log(`🚀 API Gateway corriendo en: http://localhost:3000`);
+async function bootstrap() {
+  // ... (código existente)
+  const patientService = process.env.PATIENT_SERVICE_URL || 'http://localhost:3002';
+  // AGREGAR ESTA LÍNEA:
+  const medicalService = process.env.MEDICAL_SERVICE_URL || 'http://localhost:3003';
+
+  // ... (proxies existentes de Identity y Patient)
+
+  // 5. Proxy para Medical Service (NUEVO)
+  app.use(
+    createProxyMiddleware({
+      target: medicalService,
+      changeOrigin: true,
+      pathFilter: ['/api/medical-records'],
+    }),
+  );
+
+  // 6. Docs Medical Service (NUEVO)
+  app.use(
+    createProxyMiddleware({
+      target: medicalService,
+      changeOrigin: true,
+      pathFilter: ['/docs-medical'],
+      pathRewrite: { '^/docs-medical': '/docs' },
+    }),
+  );
+
+  // ... (app.listen)
+}
 }
 bootstrap();
