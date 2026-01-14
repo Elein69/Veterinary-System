@@ -3,7 +3,7 @@ WORKDIR /app
 COPY . .
 RUN npm install
 
-RUN npx turbo run build --filter=inventory-service
+RUN npx nest build inventory-service
 
 FROM node:18-alpine AS runner
 WORKDIR /app

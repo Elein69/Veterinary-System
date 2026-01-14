@@ -6,7 +6,7 @@ COPY . .
 
 RUN npm install
 
-RUN npx turbo run build --filter=billing-service
+RUN npx nest build billing-service
 
 FROM node:18-alpine AS runner
 WORKDIR /app

@@ -6,7 +6,7 @@ COPY . .
 
 RUN npm install
 
-RUN npx turbo run build --filter=medical-service
+RUN npx nest build medical-service
 
 
 FROM node:18-alpine AS runner

@@ -6,7 +6,7 @@ COPY . .
 
 RUN npm install
 
-RUN npx turbo run build --filter=audit-service
+RUN npx nest build audit-service
 
 FROM node:18-alpine AS runner
 WORKDIR /app

@@ -3,7 +3,7 @@ WORKDIR /app
 COPY . .
 RUN npm install
 
-RUN npx turbo run build --filter=appointment-service
+RUN npx nest build appointment-service
 
 FROM node:18-alpine AS runner
 WORKDIR /app

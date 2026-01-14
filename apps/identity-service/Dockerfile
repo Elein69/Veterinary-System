@@ -6,7 +6,7 @@ COPY . .
 
 RUN npm install
 
-RUN npx turbo run build --filter=identity-service
+RUN npx nest build identity-service
 
 FROM node:18-alpine AS runner
 

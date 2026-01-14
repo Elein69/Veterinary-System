@@ -6,7 +6,7 @@ COPY . .
 
 RUN npm install
 
-RUN npx turbo run build --filter=api-gateway
+RUN npx nest build api-gateway
 
 FROM node:18-alpine AS runner
 

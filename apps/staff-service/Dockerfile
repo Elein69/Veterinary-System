@@ -3,7 +3,7 @@ WORKDIR /app
 COPY . .
 RUN npm install
 
-RUN npx turbo run build --filter=staff-service
+RUN npx nest build staff-service
 
 FROM node:18-alpine AS runner
 WORKDIR /app

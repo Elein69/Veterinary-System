@@ -5,7 +5,7 @@ COPY . .
 
 RUN npm install
 
-RUN npx turbo run build --filter=notification-service
+RUN npx nest build notification-service
 
 FROM node:18-alpine AS runner
 WORKDIR /app
