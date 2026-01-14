@@ -2,26 +2,31 @@ name: QA_Validation_Process
 
 on:
   pull_request:
-    branches: [ main ] 
+    branches: [ main ]
 
 jobs:
   run-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout del codigo
+        uses: actions/checkout@v3
 
-      - name: Setup Node.js
+      - name: Configurar Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
+          cache: 'npm'
 
-      - name: Install dependencies
+      - name: Instalar dependencias
         run: npm install
 
-      - name: Execute Microservices Tests
-       
+      - name: Ejecutar Tests de TODOS los Microservicios (vía Turbo)
+
         run: npm run test 
 
-      - name: Final Check
+      - name: Verificar Compilación Global
+        run: npm run build
+
+      - name: Mensaje Final
         if: success()
-        run: echo "✅ Los tests pasaron con éxito. Ingeniero, el código está listo para su revisión."
+        run: echo "✅ Calidad de código verificada por Turbo"
