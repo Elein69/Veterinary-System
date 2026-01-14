@@ -1,8 +1,10 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
-COPY package*.json turbo.json ./
-RUN npm ci
+
 COPY . .
+
+RUN npm ci
+
 RUN npx turbo run build --filter=iot-service
 
 FROM node:18-alpine AS runner
