@@ -1,0 +1,35 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { BillingModule } from './billing/billing.module'; // 👈 Tu nuevo módulo
+// Puedes borrar AppController y AppService si no los usas
+
+@Module({
+  imports: [
+    // 1. Configuración
+    ConfigModule.forRoot({
+      envFilePath: 'apps/billing-service/.env',
+      isGlobal: true,
+    }),
+
+    // 2. Base de Datos
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres',
+        host: config.get('DB_HOST'),
+        port: config.get<number>('DB_PORT'),
+        username: config.get('DB_USERNAME'),
+        password: config.get('DB_PASSWORD'),
+        database: config.get('DB_NAME'),
+        autoLoadEntities: true,
+        synchronize: true,
+      }),
+    }),
+
+    // 3. Módulo Funcional
+    BillingModule,
+  ],
+})
+export class AppModule {}

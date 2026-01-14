@@ -1,32 +1,34 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
-  console.log("🔋 STARTING IOT SERVICE..."); // <--- LOG DE DEPURACIÓN
+  const app = await NestFactory.create(AppModule);
+  app.enableCors();
 
-  try {
-    const app = await NestFactory.create(AppModule);
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.MQTT,
+    options: {
+      // 👇 CAMBIO AQUÍ: Usa 127.0.0.1 en vez de localhost
+      url: 'mqtt://127.0.0.1:1883', 
+    },
+  });
 
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
-    app.enableCors();
+  // 3. Configuración de Swagger (Para ver que está vivo vía web)
+  const config = new DocumentBuilder()
+    .setTitle('IoT Service')
+    .setDescription('Recibe datos de sensores vía MQTT')
+    .setVersion('1.0')
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('docs', app, document);
 
-    const config = new DocumentBuilder()
-      .setTitle('Veterinary IoT Service')
-      .setDescription('Telemetry and Vital Signs monitoring using InfluxDB')
-      .setVersion('1.0')
-      .build();
-    
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('docs', app, document);
-
-    const port = process.env.PORT || 3004;
-    await app.listen(port);
-    console.log(`🚀 IoT Service running on: http://localhost:${port}/docs`);
-  } catch (error) {
-    console.error("❌ ERROR STARTING APP:", error); // <--- PARA VER EL ERROR REAL
-  }
+  // 4. Arrancamos todo
+  await app.startAllMicroservices();
+  await app.listen(3004);
+  console.log('📡 IoT Service escuchando en:');
+  console.log('   - HTTP: http://localhost:3004/docs');
+  console.log('   - MQTT: localhost:1883 (Tópico: sensores/temperatura)');
 }
 bootstrap();

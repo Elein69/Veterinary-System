@@ -1,30 +1,48 @@
-import { Module } from '@nestjs/common';
+import { Module, Global } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { UsersModule } from './users/users.module'; // <--- Solo debe aparecer una vez
-import { User } from './users/entities/user.entity';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module'; // 👈 Agregamos AuthModule
+import Redis from 'ioredis';
 
+@Global()
 @Module({
   imports: [
-    // 1. Configuración Global (lee el .env)
-    ConfigModule.forRoot({ isGlobal: true }),
-
-    // 2. Conexión a Base de Datos
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: 'apps/identity-service/.env',
+    }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('DB_HOST'),
-        port: +configService.get('DB_PORT'),
-        username: configService.get('DB_USERNAME'),
-        password: configService.get('DB_PASSWORD'),
-        database: configService.get('DB_NAME'),
-        entities: [User],
-        synchronize: true, // Esto crea las tablas automáticamente
-      }),
       inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres',
+        host: config.get<string>('DB_HOST'),
+        port: config.get<number>('DB_PORT'),
+        username: config.get<string>('DB_USERNAME'),
+        password: config.get<string>('DB_PASSWORD'),
+        database: config.get<string>('DB_NAME'),
+        autoLoadEntities: true,
+        synchronize: true,
+      }),
     }),
     UsersModule,
+    AuthModule, // 👈 Registramos el módulo de autenticación
   ],
+  controllers: [], // AppController es opcional si ya tienes UsersController
+  providers: [
+    // Proveedor Global de Redis
+    {
+      provide: 'REDIS_CLIENT',
+      useFactory: (config: ConfigService) => {
+        return new Redis({
+          host: config.get('REDIS_HOST') || 'localhost',
+          port: config.get('REDIS_PORT') || 6379,
+        });
+      },
+      inject: [ConfigService],
+    },
+  ],
+  exports: ['REDIS_CLIENT'],
 })
 export class AppModule {}

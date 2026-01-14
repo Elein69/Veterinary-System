@@ -1,11 +1,30 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { DynamooseModule } from 'nestjs-dynamoose';
+import { ClientsModule, Transport } from '@nestjs/microservices';
 import { PatientsService } from './patients.service';
 import { PatientsController } from './patients.controller';
-import { Patient } from './entities/patient.entity';
+import { PatientSchema } from './schemas/patient.schema';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Patient])],
+  imports: [
+    DynamooseModule.forFeature([
+      {
+        name: 'Patient',
+        schema: PatientSchema,
+      },
+    ]),
+   ClientsModule.register([
+      {
+        name: 'KAFKA_SERVICE',
+        transport: Transport.KAFKA,
+        options: {
+          // 👇 CAMBIO: Usamos 127.0.0.1 en lugar de localhost
+          client: { brokers: ['127.0.0.1:9092'] }, 
+          consumer: { groupId: 'patient-consumer' },
+        },
+      },
+    ]),
+  ],
   controllers: [PatientsController],
   providers: [PatientsService],
 })

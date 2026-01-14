@@ -1,14 +1,19 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { TelemetryModule } from './telemetry/telemetry.module';
+import { ConfigModule } from '@nestjs/config'; // <--- Importante
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { TelemetryModule } from './telemetry/telemetry.module'; // Tu módulo de telemetría
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ 
+    // 👇 ESTO ES LO QUE ARREGLA EL "UNDEFINED"
+    ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env', // <--- AGREGAMOS ESTO para obligarlo a leer el archivo local
+      envFilePath: 'apps/iot-service/.env', 
     }),
-    TelemetryModule,
+    TelemetryModule, 
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

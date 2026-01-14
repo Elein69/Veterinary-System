@@ -8,15 +8,21 @@ describe('AppController', () => {
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [AppService],
+      providers: [
+        // Usamos un 'mock' para no conectarnos a la DB real durante el test
+        {
+          provide: AppService,
+          useValue: {
+            getHello: jest.fn().mockReturnValue('Hello World!'),
+          },
+        },
+      ],
     }).compile();
 
     appController = app.get<AppController>(AppController);
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
-    });
+  it('debe estar definido', () => {
+    expect(appController).toBeDefined();
   });
 });

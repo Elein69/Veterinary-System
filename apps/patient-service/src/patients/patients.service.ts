@@ -1,32 +1,52 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Patient } from './entities/patient.entity';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
+import { InjectModel } from 'nestjs-dynamoose';
+import type { Model } from 'nestjs-dynamoose';
+import { Patient, PatientKey } from './interfaces/patient.interface';
 import { CreatePatientDto } from './dto/create-patient.dto';
+import { ClientProxy } from '@nestjs/microservices';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class PatientsService {
   constructor(
-    @InjectRepository(Patient)
-    private patientsRepository: Repository<Patient>,
+    @InjectModel('Patient')
+    private readonly patientModel: Model<Patient, PatientKey>,
+    
+    @Inject('KAFKA_SERVICE') private readonly kafkaClient: ClientProxy,
   ) {}
 
-  create(createPatientDto: CreatePatientDto) {
-    const patient = this.patientsRepository.create(createPatientDto);
-    return this.patientsRepository.save(patient);
+  async create(createPatientDto: CreatePatientDto) {
+    // 1. Guardar en DynamoDB (Mapeo explícito para evitar errores de tipo)
+    const newPatient = await this.patientModel.create({
+      id: uuidv4(),
+      name: createPatientDto.name,
+      species: createPatientDto.species,
+      breed: createPatientDto.breed,
+      ownerName: createPatientDto.ownerName,
+      ownerEmail: createPatientDto.ownerEmail,
+    });
+
+    // 2. Notificar a través de Kafka (Event-Driven)
+    // El evento 'patient_created' permitirá que otros servicios reaccionen
+    this.kafkaClient.emit('patient_created', newPatient);
+    
+    return newPatient;
   }
 
-  findAll() {
-    return this.patientsRepository.find();
+  async findAll() {
+    return this.patientModel.scan().exec();
   }
 
   async findOne(id: string) {
-    const patient = await this.patientsRepository.findOneBy({ id });
-    if (!patient) throw new NotFoundException(`Patient with ID ${id} not found`);
+    const patient = await this.patientModel.get({ id });
+    if (!patient) {
+      throw new NotFoundException(`Patient with ID ${id} not found`);
+    }
     return patient;
   }
 
-  findByOwner(ownerId: string) {
-    return this.patientsRepository.findBy({ ownerId });
+  async findByOwner(ownerEmail: string) {
+    // IMPORTANTE: Para que esto funcione, ownerEmail debe ser un INDEX en el Schema
+    return this.patientModel.query('ownerEmail').eq(ownerEmail).exec();
   }
 }

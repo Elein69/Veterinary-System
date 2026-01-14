@@ -1,7 +1,12 @@
-version: '3.8'
+
 
 services:
-  # SQL Database (Identity & Patient Services)
+  # ----------------------------------------
+  # DATABASES LAYER
+  # ----------------------------------------
+  
+  # 1. SQL Database (Target: Patient, Staff, Inventory, Billing Services)
+  # In AWS Prod: This can be replaced by AWS RDS
   postgres:
     image: postgres:15-alpine
     container_name: vet_postgres
@@ -10,36 +15,140 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: Veterinaria2026!
-      POSTGRES_DB: postgres
+      POSTGRES_DB: veterinary_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - vet_network
 
-  # NoSQL Database (Medical Service)
+  # 2. NoSQL Database (Target: Medical Records)
+  # In AWS Prod: This connects directly to AWS DynamoDB Service
+
   dynamodb-local:
     command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
     image: "amazon/dynamodb-local:latest"
-    container_name: vet_dynamodb
+    container_name: vet_dynamodb  # <--- Este es el nombre real
     ports:
       - "8000:8000"
     volumes:
       - "./docker/dynamodb:/home/dynamodblocal/data"
     working_dir: /home/dynamodblocal
+    networks:
+      - vet_network
 
-# Time Series Database (IoT Service)
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin
+    container_name: vet_dynamodb_admin
+    ports:
+      - "8001:8001"
+    environment:
+      # 👇 CAMBIO: Usamos el nombre del container_name y añadimos la región local
+      DYNAMO_ENDPOINT: "http://vet_dynamodb:8000"
+      AWS_REGION: "us-east-1"
+      AWS_ACCESS_KEY_ID: "local"
+      AWS_SECRET_ACCESS_KEY: "local"
+    depends_on:
+      - dynamodb-local
+    networks:
+      - vet_network
+
+  # 3. Time Series Database (Target: IoT Telemetry)
+  # Hosted in Docker (EC2) for both Local and AWS
   influxdb:
     image: influxdb:2.7
     container_name: vet_influxdb
     ports:
       - "8086:8086"
-    environment:
-      DOCKER_INFLUXDB_INIT_MODE: setup
-      DOCKER_INFLUXDB_INIT_USERNAME: admin
-      DOCKER_INFLUXDB_INIT_PASSWORD: Veterinaria2026!
-      DOCKER_INFLUXDB_INIT_ORG: veterinary
-      DOCKER_INFLUXDB_INIT_BUCKET: telemetry
     volumes:
       - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword
+      - DOCKER_INFLUXDB_INIT_ORG=veterinaria_org
+      - DOCKER_INFLUXDB_INIT_BUCKET=telemetry
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token
+    networks:
+      - vet_network
 
+  # 4. Cache Database (Target: Identity Service)
+  # In AWS Prod: Can be replaced by ElastiCache or kept in Docker
+  redis:
+    image: redis:alpine
+    container_name: vet_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - vet_network
+
+  # ----------------------------------------
+  # MESSAGE BROKERS LAYER
+  # ----------------------------------------
+
+  # 5. RabbitMQ (Target: RPC Communication Staff <-> Appointment)
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: vet_rabbitmq
+    ports:
+      - "5672:5672"   # App Connection
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - vet_network
+
+  # 6. MQTT Broker (Target: IoT Sensors)
+  mosquitto:
+    image: eclipse-mosquitto
+    container_name: vet_mosquitto
+    ports:
+      - "1883:1883" # MQTT Port
+      - "9001:9001" # Websockets
+    volumes:
+      # REQUIRED: You must create ./mosquitto/mosquitto.conf locally
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks:
+      - vet_network
+
+  # 7. Kafka Cluster (Target: Billing, Notification, Audit)
+  zookeeper:
+    image: wurstmeister/zookeeper
+    container_name: vet_zookeeper
+    ports:
+      - "2181:2181"
+    networks:
+      - vet_network
+
+  kafka:
+    image: wurstmeister/kafka
+    container_name: vet_kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # 👇 CAMBIO CRÍTICO: Forzamos a que Kafka se anuncie en la IP de bucle
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://127.0.0.1:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Mantenemos tus tópicos
+      KAFKA_CREATE_TOPICS: "crear_factura:1:1,staff_status_changed:1:1,inventory_reduced:1:1,patient_created:1:1"
+    depends_on:
+      - zookeeper
+    networks:
+      - vet_network
+
+# Persistent Volumes
 volumes:
   postgres_data:
-  influxdb_data: # <--- NEW VOLUME
+  influxdb_data:
+  influxdb_config:
+  mosquitto_data:
+  mosquitto_log:
+
+# Internal Network
+networks:
+  vet_network:
+    driver: bridge

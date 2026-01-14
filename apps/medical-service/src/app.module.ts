@@ -1,23 +1,22 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { DynamooseModule } from 'nestjs-dynamoose';
 import { MedicalRecordsModule } from './medical-records/medical-records.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
     DynamooseModule.forRoot({
-      local: 'http://localhost:8000', // FIX: Pass URL string directly here
-      aws: {
+      local: 'http://127.0.0.1:8000', // 👈 Cambia el string por 'true' para activar modo local
+      aws: { 
         region: 'us-east-1',
         accessKeyId: 'local',
         secretAccessKey: 'local',
       },
       table: {
         create: true,
-        prefix: '',
-        suffix: '',
+        prefix: 'vet_',
+        suffix: '-table',
       },
+      // 👇 Agregamos esta línea para forzar el endpoint de localhost
     }),
     MedicalRecordsModule,
   ],

@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "apps/api-gateway/src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "webpack": true,
+    "tsConfigPath": "tsconfig.build.json"
+  },
+  "monorepo": true,
+  "root": true,
+  "projects": {
+    "identity-service": {
+      "type": "application",
+      "root": "apps/identity-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/identity-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/identity-service/tsconfig.app.json"
+      }
+    },
+    "patient-service": {
+      "type": "application",
+      "root": "apps/patient-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/patient-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/patient-service/tsconfig.app.json"
+      }
+    },
+    "medical-service": {
+      "type": "application",
+      "root": "apps/medical-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/medical-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/medical-service/tsconfig.app.json"
+      }
+    },
+    "appointment-service": {
+      "type": "application",
+      "root": "apps/appointment-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/appointment-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/appointment-service/tsconfig.app.json"
+      }
+    },
+    "iot-service": {
+      "type": "application",
+      "root": "apps/iot-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/iot-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/iot-service/tsconfig.app.json"
+      }
+    },
+    "billing-service": {
+      "type": "application",
+      "root": "apps/billing-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/billing-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/billing-service/tsconfig.app.json"
+      }
+    },
+    "api-gateway": {
+      "type": "application",
+      "root": "apps/api-gateway",
+      "entryFile": "main",
+      "sourceRoot": "apps/api-gateway/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/api-gateway/tsconfig.app.json"
+      }
+    },
+    "notification-service": {
+      "type": "application",
+      "root": "apps/notification-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/notification-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/notification-service/tsconfig.app.json"
+      }
+    },
+    "inventory-service": {
+      "type": "application",
+      "root": "apps/inventory-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/inventory-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/inventory-service/tsconfig.app.json"
+      }
+    },
+    "staff-service": {
+      "type": "application",
+      "root": "apps/staff-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/staff-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/staff-service/tsconfig.app.json"
+      }
+    },
+    "audit-service": {
+      "type": "application",
+      "root": "apps/audit-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/audit-service/src",
+      "compilerOptions": {
+          "tsConfigPath": "apps/audit-service/tsconfig.app.json"
+      }
+    }
+  }
+}

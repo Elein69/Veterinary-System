@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { InjectModel } from 'nestjs-dynamoose';
-// FIX: Separate the import. 'Model' must be imported as a type.
-import type { Model } from 'nestjs-dynamoose'; 
+import { ClientProxy } from '@nestjs/microservices'; // 👈 Importar
+import type { Model } from 'nestjs-dynamoose';
 import { MedicalRecord, MedicalRecordKey } from './entities/medical-record.interface';
 import { CreateMedicalRecordDto } from './dto/create-medical-record.dto';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,6 +11,7 @@ export class MedicalRecordsService {
   constructor(
     @InjectModel('MedicalRecord')
     private readonly medicalRecordModel: Model<MedicalRecord, MedicalRecordKey>,
+    @Inject('KAFKA_SERVICE') private kafkaClient: ClientProxy,
   ) {}
 
   async create(createMedicalRecordDto: CreateMedicalRecordDto) {
@@ -19,6 +20,15 @@ export class MedicalRecordsService {
       ...createMedicalRecordDto,
       date: new Date().toISOString(),
     });
+
+    this.kafkaClient.emit('medical_record_created', {
+      recordId: record.id,
+      patientId: record.patientId,
+      diagnosis: record.diagnosis,
+      timestamp: new Date()
+    });
+    console.log(`📢 Evento enviado a Kafka: medical_record_created`);
+    
     return record;
   }
 

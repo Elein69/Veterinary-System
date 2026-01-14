@@ -1,41 +1,48 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
+  const logger = new Logger('API_GATEWAY');
   const app = await NestFactory.create(AppModule);
   app.enableCors();
 
-  // URLs (Asegúrate de que coincidan con tus puertos)
-  const SERVICES = {
-    medical: 'http://localhost:3003',
-    iot: 'http://localhost:3004', 
-  };
+  const services = [
+    { path: '/auth', target: 'http://localhost:3001' },
+    { path: '/patients', target: 'http://localhost:3002' },
+    { path: '/medical-records', target: 'http://localhost:3003' },
+    { path: '/iot', target: 'http://localhost:3004' },
+    { path: '/appointments', target: 'http://localhost:3005' },
+    { path: '/billing', target: 'http://localhost:3006' },
+    { path: '/inventory', target: 'http://localhost:3007' },
+    { path: '/notifications', target: 'http://localhost:3008' },
+    { path: '/staff', target: 'http://localhost:3009' },
+    { path: '/audit', target: 'http://localhost:3010' },
+  ];
 
-  console.log('--- 🚀 GATEWAY INICIANDO ---');
+  services.forEach(service => {
+    app.use(service.path, createProxyMiddleware({
+      target: service.target,
+      changeOrigin: true,
+      pathRewrite: { [`^${service.path}`]: '' },
+      // 👇 Aquí está la corrección para la nueva versión de la librería
+      on: {
+        proxyReq: (proxyReq, req: any, res) => {
+          logger.log(`🔀 Redirigiendo: ${req.method} ${req.url} -> ${service.target}`);
+        },
+        error: (err, req, res) => {
+          logger.error(`❌ Error en el proxy hacia ${service.target}: ${err.message}`);
+        }
+      }
+    }));
+  });
 
-  // 1. Proxy MEDICAL
-  app.use('/medical-records', createProxyMiddleware({ 
-    target: SERVICES.medical, 
-    changeOrigin: true 
-  }));
-
-  // 2. Proxy IOT (API)
-  app.use('/api/telemetry', createProxyMiddleware({ 
-    target: SERVICES.iot, 
-    changeOrigin: true 
-  }));
-
-  // 3. Proxy IOT (DOCS) - Configuración "Wildcard"
-  // Captura TODO lo que empiece por /docs-iot
-  app.use('/docs-iot', createProxyMiddleware({
-    target: SERVICES.iot,
-    changeOrigin: true,
-    pathRewrite: { '^/docs-iot': '/docs' }, // Borra el prefijo y manda /docs
-  }));
-
-  await app.listen(3000);
-  console.log(`Gateway listo: http://localhost:3000`);
-  console.log(`Prueba IoT: http://localhost:3000/docs-iot/ (¡Ojo con la barra al final!)`);
+  const port = 3000;
+  await app.listen(port);
+  
+  console.log('---------------------------------------------------------');
+  console.log(`🏰 API GATEWAY PORT: ${port}`);
+  console.log('---------------------------------------------------------');
 }
 bootstrap();
