@@ -1,27 +1,29 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
+import { DynamooseModule } from 'nestjs-dynamoose';
 import { PatientsModule } from './patients/patients.module';
-import { Patient } from './patients/entities/patient.entity';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('DB_HOST'),
-        port: +configService.get('DB_PORT'),
-        username: configService.get('DB_USERNAME'),
-        password: configService.get('DB_PASSWORD'),
-        database: configService.get('DB_NAME'),
-        entities: [Patient],
-        synchronize: true,
-      }),
-      inject: [ConfigService],
+    // 1. Cargar variables de entorno
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: 'apps/patient-service/.env',
     }),
-    PatientsModule,
+
+    // 2. Conexión a DynamoDB Local (NoSQL)
+    DynamooseModule.forRoot({
+      local: 'http://127.0.0.1:8000', 
+      aws: { region: 'us-east-1' },
+      table: {
+        create: true,
+        prefix: 'vet_',
+        suffix: '-table',
+      },
+    }),
+
+    // 3. Módulo de lógica de negocio
+    PatientsModule, 
   ],
 })
 export class AppModule {}

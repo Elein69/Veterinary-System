@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsInt, Min, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsString, IsEmail, IsInt, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreatePatientDto {
@@ -16,13 +16,13 @@ export class CreatePatientDto {
   @IsString()
   breed: string;
 
-  @ApiProperty({ example: 4 })
-  @IsInt()
-  @Min(0)
-  age: number;
-
-  @ApiProperty({ example: 'uuid-v4-del-user' })
+  @ApiProperty({ example: 'Elein Inaquiza' })
   @IsString()
   @IsNotEmpty()
-  ownerId: string;
+  ownerName: string;
+
+  @ApiProperty({ example: 'elein@ejemplo.com' })
+  @IsEmail()
+  @IsNotEmpty()
+  ownerEmail: string;
 }

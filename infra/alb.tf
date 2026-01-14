@@ -4,18 +4,17 @@ resource "aws_lb" "app_lb" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
   subnets            = [aws_subnet.public_1.id, aws_subnet.public_2.id]
-
-  tags = { Name = "${var.project_name}-alb" }
 }
 
 resource "aws_lb_target_group" "app_tg" {
-  name     = "${var.project_name}-tg"
-  port     = 80
-  protocol = "HTTP"
-  vpc_id   = aws_vpc.main.id
+  name        = "${var.project_name}-tg"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip" # Necesario para ECS en modo awsvpc
 
   health_check {
-    path = "/"
+    path    = "/"
     matcher = "200-404"
   }
 }

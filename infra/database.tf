@@ -1,4 +1,3 @@
-# GRUPOS DE SUBREDES
 resource "aws_db_subnet_group" "rds_subnet_group" {
   name       = "${var.project_name}-rds-group"
   subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]
@@ -9,7 +8,7 @@ resource "aws_elasticache_subnet_group" "redis_subnet_group" {
   subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]
 }
 
-# 1. POSTGRESQL (RDS)
+# 1. PostgreSQL
 resource "aws_db_instance" "postgres_db" {
   identifier             = "vet-postgres-db"
   engine                 = "postgres"
@@ -24,7 +23,7 @@ resource "aws_db_instance" "postgres_db" {
   skip_final_snapshot    = true
 }
 
-# 2. REDIS (ElastiCache) - ¡NUEVO!
+# 2. Redis
 resource "aws_elasticache_cluster" "redis" {
   cluster_id           = "vet-redis"
   engine               = "redis"
@@ -36,23 +35,13 @@ resource "aws_elasticache_cluster" "redis" {
   security_group_ids   = [aws_security_group.db_sg.id]
 }
 
-# 3. DYNAMODB
+# 3. DynamoDB
 resource "aws_dynamodb_table" "patients_table" {
-  name           = "Patients"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "id"
+  name         = "Patients"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
   attribute {
     name = "id"
-    type = "S"
-  }
-}
-
-resource "aws_dynamodb_table" "medical_records_table" {
-  name           = "MedicalRecords"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "recordId"
-  attribute {
-    name = "recordId"
     type = "S"
   }
 }
