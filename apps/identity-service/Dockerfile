@@ -1,9 +1,30 @@
-FROM node:18-alpine
+FROM node:18-alpine AS builder
+
 WORKDIR /app
-RUN npm install -g pnpm
-COPY package.json ./
-RUN pnpm install
+
+
+COPY package*.json turbo.json ./
+
+
+RUN npm ci
+
 COPY . .
-RUN pnpm build
+
+
+RUN npx turbo run build --filter=identity-service
+
+
+FROM node:18-alpine AS runner
+
+WORKDIR /app
+
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+
+
+COPY --from=builder /app/dist/apps/identity-service ./dist
+
+
 EXPOSE 3001
+
 CMD ["node", "dist/main"]
