@@ -1,7 +1,7 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 COPY . .
-RUN npm ci
+RUN npm install
 
 RUN npx turbo run build --filter=appointment-service
 

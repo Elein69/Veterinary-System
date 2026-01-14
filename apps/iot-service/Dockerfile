@@ -3,7 +3,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN npm ci
+RUN npm install
 
 RUN npx turbo run build --filter=iot-service
 
