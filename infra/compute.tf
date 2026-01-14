@@ -1,3 +1,6 @@
+# compute.tf
+
+# 1. Buscar imagen Amazon Linux 2023
 data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
@@ -7,62 +10,131 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
+# 2. Instancia Bastion (Jumpbox)
 resource "aws_instance" "jumpbox" {
-  ami           = data.aws_ami.amazon_linux.id
-  instance_type = "t2.micro"
-  subnet_id     = aws_subnet.public_1.id
-  key_name      = var.key_name
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type          = "t2.micro"
+  subnet_id              = aws_subnet.public_1.id
+  key_name               = var.key_name
   vpc_security_group_ids = [aws_security_group.bastion_sg.id]
 
-  # --- SUPER SCRIPT: InfluxDB + Tunnel + Backups ---
+  # --- CONFIGURACIÓN AUTOMÁTICA ---
   user_data = base64encode(<<-EOF
               #!/bin/bash
-              dnf update -y
-              dnf install -y postgresql15 docker
               
-              # 1. Iniciar Docker y correr INFLUXDB (Base de datos Series de Tiempo)
+              # A. Instalar herramientas
+              dnf update -y
+              dnf install -y docker postgresql15 git wget tar gcc make
+              
+              # B. Iniciar InfluxDB (Docker)
               service docker start
               systemctl enable docker
               usermod -a -G docker ec2-user
-              
-              docker run -d --name influxdb -p 8086:8086 -v /home/ec2-user/influx_data:/var/lib/influxdb2 influxdb:2.7
+              docker run -d --name influxdb -p 8086:8086 influxdb:2.7
 
-              # 2. Instalar Cloudflared (Conexión On-Premise)
+              # C. Instalar Cloudflared (Túnel)
               curl -L --output cloudflared.rpm https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-x86_64.rpm
               rpm -ivh cloudflared.rpm
+
+              # D. Instalar sshpass (Para password automatico)
+              cd /tmp
+              wget http://sourceforge.net/projects/sshpass/files/sshpass/1.09/sshpass-1.09.tar.gz
+              tar -xvf sshpass-1.09.tar.gz
+              cd sshpass-1.09
+              ./configure
+              make
+              make install
               
-              # 3. Script de Backup Automático
+              # Preparar directorios
               mkdir -p /home/ec2-user/scripts
-              cat <<EOT >> /home/ec2-user/scripts/backup_daily.sh
+              chown ec2-user:ec2-user /home/ec2-user/scripts
+
+              # ==========================================
+              # E. SCRIPT 1: BACKUP AUTOMÁTICO (ENVÍA A UCE)
+              # ==========================================
+              cat <<EOT >> /home/ec2-user/scripts/backup_uce.sh
               #!/bin/bash
-              FECHA=\$(date +%F)
+              FECHA=\$(date +%F) # Formato YYYY-MM-DD
               ARCHIVO="backup_\$FECHA.sql"
               
-              # Dump de RDS
-              PGPASSWORD='${var.db_password}' pg_dump -h ${aws_db_instance.postgres_db.address} -U ${var.db_username} -d postgres > /tmp/\$ARCHIVO
+              # Detectar ambiente
+              ENV_FOLDER="QA"
+              if [[ "${var.project_name}" == *"prod"* ]]; then
+                 ENV_FOLDER="PROD"
+              fi
               
-              # Enviar a UCE (Requiere login manual 1 vez)
-              scp -o "ProxyCommand=cloudflared access ssh --hostname server.distribuidauce.org" /tmp/\$ARCHIVO distribuida@server.distribuidauce.org:~/backups_veterinaria/
+              echo "--- Iniciando Backup Automático (\$FECHA) ---"
               
+              # 1. Dumpear la DB de AWS RDS
+              PGPASSWORD='${var.db_password}' pg_dump -h ${aws_db_instance.postgres_db.address} -U ${var.db_username} --clean --if-exists -d postgres > /tmp/\$ARCHIVO
+
+              # 2. Enviar a UCE (On-Premise)
+              sshpass -p 'useruce1' scp -o "ProxyCommand=cloudflared access ssh --hostname server.distribuidauce.org" -o StrictHostKeyChecking=no /tmp/\$ARCHIVO distribuida@server.distribuidauce.org:/home/distribuida/Documents/distribuida2/Elein_Inaquiza/\$ENV_FOLDER/
+
+              # 3. Limpiar
               rm /tmp/\$ARCHIVO
+              echo "Backup enviado exitosamente."
               EOT
+
+              # ==========================================
+              # F. SCRIPT 2: RESTORE A PETICIÓN (TRAE DE UCE)
+              # ==========================================
+              cat <<EOT >> /home/ec2-user/scripts/restore_uce.sh
+              #!/bin/bash
               
-              chmod +x /home/ec2-user/scripts/backup_daily.sh
+              # Detectar ambiente
+              ENV_FOLDER="QA"
+              if [[ "${var.project_name}" == *"prod"* ]]; then
+                 ENV_FOLDER="PROD"
+              fi
+
+              echo "============================================="
+              echo " SISTEMA DE RECUPERACIÓN DE DESASTRES (DRP)  "
+              echo " Ambiente actual: \$ENV_FOLDER                 "
+              echo "============================================="
+              echo "Ingrese la fecha del backup a restaurar (Formato YYYY-MM-DD):"
+              read FECHA_RESTORE
+              
+              ARCHIVO="backup_\$FECHA_RESTORE.sql"
+              RUTA_REMOTA="/home/distribuida/Documents/distribuida2/Elein_Inaquiza/\$ENV_FOLDER/\$ARCHIVO"
+              
+              echo "1. Buscando archivo \$ARCHIVO en el servidor de la UCE..."
+              
+              # Descargar desde UCE a AWS
+              sshpass -p 'useruce1' scp -o "ProxyCommand=cloudflared access ssh --hostname server.distribuidauce.org" -o StrictHostKeyChecking=no distribuida@server.distribuidauce.org:\$RUTA_REMOTA /tmp/\$ARCHIVO
+              
+              if [ -f "/tmp/\$ARCHIVO" ]; then
+                  echo "Archivo descargado correctamente."
+                  echo "ATENCIÓN: Esto borrará los datos actuales y pondrá los de la fecha \$FECHA_RESTORE."
+                  echo "Presione ENTER para confirmar o Ctrl+C para cancelar..."
+                  read confirmacion
+                  
+                  echo "2. Restaurando base de datos en AWS RDS..."
+                  PGPASSWORD='${var.db_password}' psql -h ${aws_db_instance.postgres_db.address} -U ${var.db_username} -d postgres < /tmp/\$ARCHIVO
+                  
+                  echo "¡Restauración completada con éxito!"
+                  rm /tmp/\$ARCHIVO
+              else
+                  echo "ERROR: No se encontró un backup con la fecha \$FECHA_RESTORE en el servidor de la UCE."
+              fi
+              EOT
+
+              # G. Permisos y CRON
+              chmod +x /home/ec2-user/scripts/*.sh
               chown -R ec2-user:ec2-user /home/ec2-user/scripts
               
-              # 4. CRON (Backup diario 2 AM)
-              echo "0 2 * * * /home/ec2-user/scripts/backup_daily.sh >> /var/log/backup.log 2>&1" | crontab -
+              # Programar el backup automático todos los días a las 02:00 AM
+              echo "0 2 * * * /home/ec2-user/scripts/backup_uce.sh >> /var/log/backup.log 2>&1" | crontab -
               EOF
   )
 
   tags = {
     Name = "${var.project_name}-JumpBox"
-    Role = "Admin/Backup/InfluxDB"
   }
 }
 
-resource "aws_eip" "jumpbox_eip" {
-  domain   = "vpc"
+resource "aws_eip" "bastion_eip" {
   instance = aws_instance.jumpbox.id
-  tags = { Name = "${var.project_name}-jumpbox-ip" }
+  domain   = "vpc"
+  tags     = { Name = "${var.project_name}-bastion-eip" }
 }

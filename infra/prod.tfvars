@@ -1,12 +1,11 @@
-# --- CONFIGURACIÓN DE PRODUCCIÓN ---
-project_name      = "vet-system-prod" # Nombre diferente
-key_name          = "vockey"          # Asegúrate que exista en esta cuenta
+aws_region      = "us-east-1"
+project_name    = "vet-system-prod"
+docker_username = "eleinn69"
 
-# --- DATOS DE LA BASE DE DATOS (PROD) ---
-db_username       = "admin_prod"      # Usuario serio
-db_password       = "GranVeterinariaSegura2026!" # Contraseña fuerte
+# CREDENCIALES CUENTA 2
+aws_access_key    = "PEGA_AQUI..."
+aws_secret_key    = "PEGA_AQUI..."
+aws_session_token = "PEGA_AQUI..."
 
-# --- CREDENCIALES AWS (Cuenta 2) ---
-aws_access_key    = "ASIA..."      # <--- PEGA TU CLAVE DE CUENTA 2
-aws_secret_key    = "..."          # <--- PEGA TU SECRETO DE CUENTA 2
-aws_session_token = "..."          # <--- PEGA TU TOKEN DE CUENTA 2
+db_username = "admin_prod"
+db_password = "PasswordDificil2026!"

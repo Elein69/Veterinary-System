@@ -1,28 +1,30 @@
 variable "aws_region" {
-  description = "Región de AWS Academy"
+  description = "Región de AWS"
   default     = "us-east-1"
 }
 
 variable "project_name" {
-  default = "vet-system"
+  description = "Nombre del proyecto (ej: vet-system-qa)"
 }
 
 variable "key_name" {
-  description = "Nombre de la llave SSH en AWS"
-  default     = "vockey" 
+  description = "Nombre del par de claves SSH (vockey)"
+  default     = "vockey"
 }
 
-# Credenciales (Se llenan en los archivos .tfvars)
-variable "aws_access_key" {}
-variable "aws_secret_key" {}
-variable "aws_session_token" {}
+variable "docker_username" {
+  description = "eleinn69"
+}
 
-# Bases de Datos
 variable "db_username" {
   default = "postgres"
 }
 
 variable "db_password" {
-  description = "Contraseña de la DB"
-  sensitive   = true
+  sensitive = true
 }
+
+# Credenciales (se inyectan desde el archivo .tfvars)
+variable "aws_access_key" {}
+variable "aws_secret_key" {}
+variable "aws_session_token" {}
