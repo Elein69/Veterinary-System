@@ -8,27 +8,29 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors();
 
+  // URL del Load Balancer (DNS que te da AWS)
+  const ALB_URL = 'http://vet-system-qa-alb-1361856451.us-east-1.elb.amazonaws.com';
+
   const services = [
-    { path: '/auth', target: 'http://localhost:3001' },
-    { path: '/patients', target: 'http://localhost:3002' },
-    { path: '/medical-records', target: 'http://localhost:3003' },
-    { path: '/iot', target: 'http://localhost:3004' },
-    { path: '/appointments', target: 'http://localhost:3005' },
-    { path: '/billing', target: 'http://localhost:3006' },
-    { path: '/inventory', target: 'http://localhost:3007' },
-    { path: '/notifications', target: 'http://localhost:3008' },
-    { path: '/staff', target: 'http://localhost:3009' },
-    { path: '/audit', target: 'http://localhost:3010' },
+    { path: '/auth', target: `${ALB_URL}` },
+    { path: '/patients', target: `${ALB_URL}` },
+    { path: '/medical-records', target: `${ALB_URL}` },
+    { path: '/iot', target: `${ALB_URL}` },
+    { path: '/appointments', target: `${ALB_URL}` },
+    { path: '/billing', target: `${ALB_URL}` },
+    { path: '/inventory', target: `${ALB_URL}` },
+    { path: '/notifications', target: `${ALB_URL}` },
+    { path: '/staff', target: `${ALB_URL}` },
+    { path: '/audit', target: `${ALB_URL}` },
   ];
 
   services.forEach(service => {
     app.use(service.path, createProxyMiddleware({
       target: service.target,
       changeOrigin: true,
-      pathRewrite: { [`^${service.path}`]: '' },
-      // 👇 Aquí está la corrección para la nueva versión de la librería
+      pathRewrite: { [`^${service.path}`]: service.path }, // Mantenemos el path para que el ALB sepa a dónde enviarlo
       on: {
-        proxyReq: (proxyReq, req: any, res) => {
+        proxyReq: (proxyReq, req: any) => {
           logger.log(`🔀 Redirigiendo: ${req.method} ${req.url} -> ${service.target}`);
         },
         error: (err, req, res) => {
@@ -43,6 +45,7 @@ async function bootstrap() {
   
   console.log('---------------------------------------------------------');
   console.log(`🏰 API GATEWAY PORT: ${port}`);
+  console.log(`🔗 REDIRIGIENDO AL ALB: ${ALB_URL}`);
   console.log('---------------------------------------------------------');
 }
 bootstrap();

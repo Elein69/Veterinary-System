@@ -5,13 +5,14 @@ pnpm-lock.yaml
 *.log
 .DS_Store
 
-# --- TERRAFORM ---
+# .gitignore
 .terraform/
 *.tfstate
 *.tfstate.backup
-.terraform.lock.hcl
-*.tfvars
-*.plan
+*.exe
+terraform.tfvars
+# No subir credenciales
+qa.tfvars
 
 # IDEs
 .vscode/

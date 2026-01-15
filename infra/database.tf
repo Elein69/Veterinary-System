@@ -8,11 +8,12 @@ resource "aws_elasticache_subnet_group" "redis_subnet_group" {
   subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]
 }
 
-# 1. PostgreSQL
+# database.tf
+
 resource "aws_db_instance" "postgres_db" {
   identifier             = "vet-postgres-db"
   engine                 = "postgres"
-  engine_version         = "16.3"
+  engine_version         = "13.18"          # <--- Versión exacta de tu lista
   instance_class         = "db.t3.micro"
   allocated_storage      = 20
   username               = var.db_username
@@ -21,6 +22,9 @@ resource "aws_db_instance" "postgres_db" {
   vpc_security_group_ids = [aws_security_group.db_sg.id]
   publicly_accessible    = false
   skip_final_snapshot    = true
+
+  # El parameter group debe coincidir con la versión mayor (13)
+  parameter_group_name   = "default.postgres13" 
 }
 
 # 2. Redis
