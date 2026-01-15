@@ -1,3 +1,5 @@
+# database.tf
+
 resource "aws_db_subnet_group" "rds_subnet_group" {
   name       = "${var.project_name}-rds-group"
   subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]
@@ -8,12 +10,14 @@ resource "aws_elasticache_subnet_group" "redis_subnet_group" {
   subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]
 }
 
-# database.tf
-
 resource "aws_db_instance" "postgres_db" {
   identifier             = "vet-postgres-db"
+  
+  # IMPORTANTE: Esto crea una BD llamada "postgres" (o vet_db) para conectar
+  db_name                = "postgres" 
+  
   engine                 = "postgres"
-  engine_version         = "13.18"          # <--- Versión exacta de tu lista
+  engine_version         = "13.18"
   instance_class         = "db.t3.micro"
   allocated_storage      = 20
   username               = var.db_username
@@ -22,8 +26,6 @@ resource "aws_db_instance" "postgres_db" {
   vpc_security_group_ids = [aws_security_group.db_sg.id]
   publicly_accessible    = false
   skip_final_snapshot    = true
-
-  # El parameter group debe coincidir con la versión mayor (13)
   parameter_group_name   = "default.postgres13" 
 }
 

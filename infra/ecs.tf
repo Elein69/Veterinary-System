@@ -1,4 +1,4 @@
-# ecs.tf
+# ecs.tf - ARCHIVO COMPLETO Y CORREGIDO
 
 # 1. Cluster
 resource "aws_ecs_cluster" "main" {
@@ -28,7 +28,7 @@ resource "aws_cloudwatch_log_group" "ecs_logs" {
   retention_in_days = 1
 }
 
-# --- LISTA DE MICROSERVICIOS (Sin incluir el Gateway aquí para manejo especial) ---
+# --- LISTA DE MICROSERVICIOS ---
 locals {
   microservices_map = {
     "identity-service"     = 3001
@@ -44,7 +44,7 @@ locals {
   }
 }
 
-# --- TASK DEFINITIONS PARA MICROSERVICIOS ---
+# --- TASK DEFINITIONS PARA MICROSERVICIOS (CORREGIDO CON VARIABLES) ---
 resource "aws_ecs_task_definition" "microservices" {
   for_each                 = local.microservices_map
   family                   = each.key
@@ -58,7 +58,6 @@ resource "aws_ecs_task_definition" "microservices" {
 
   container_definitions = jsonencode([{
     name      = each.key
-    # CAMBIO: Ahora usa la URL del ECR que creamos
     image     = "${aws_ecr_repository.microservices[each.key].repository_url}:qa"
     cpu       = 256
     memory    = 256
@@ -72,8 +71,25 @@ resource "aws_ecs_task_definition" "microservices" {
         "awslogs-stream-prefix" = each.key
       }
     }
+    
+    # --- AQUÍ ESTÁN LAS VARIABLES QUE TE FALTABAN ---
     environment = [
-      { name = "PORT", value = tostring(each.value) }
+      { name = "PORT", value = tostring(each.value) },
+      
+      # Variables de Base de Datos (Postgres)
+      { name = "DB_HOST", value = aws_db_instance.postgres_db.address },
+      { name = "DB_PORT", value = "5432" },
+      { name = "DB_USERNAME", value = var.db_username },
+      { name = "DB_PASSWORD", value = var.db_password },
+      { name = "DB_NAME", value = "postgres" },
+
+      # Variables de Redis (Cache)
+      { name = "REDIS_HOST", value = aws_elasticache_cluster.redis.cache_nodes[0].address },
+      { name = "REDIS_PORT", value = "6379" },
+
+      # Placeholders para evitar crashes en IoT/Notification
+      { name = "MQTT_HOST", value = "test.mosquitto.org" },
+      { name = "KAFKA_BROKERS", value = "localhost:9092" }
     ]
   }])
 }
@@ -88,12 +104,12 @@ resource "aws_ecs_service" "microservices" {
   launch_type     = "EC2"
 
   network_configuration {
-    subnets         = [aws_subnet.private_1.id, aws_subnet.private_2.id]
-    security_groups = [aws_security_group.ecs_sg.id]
+    subnets          = [aws_subnet.private_1.id, aws_subnet.private_2.id]
+    security_groups  = [aws_security_group.ecs_sg.id]
   }
 }
 
-# --- API GATEWAY (Manejo por separado para conectar al ALB) ---
+# --- API GATEWAY (Manejo especial) ---
 resource "aws_ecs_task_definition" "api_gateway" {
   family                   = "api-gateway"
   network_mode             = "awsvpc"
@@ -106,7 +122,6 @@ resource "aws_ecs_task_definition" "api_gateway" {
 
   container_definitions = jsonencode([{
     name      = "api-gateway"
-    # CAMBIO: Usa el ECR del gateway
     image     = "${aws_ecr_repository.microservices["api-gateway"].repository_url}:qa"
     cpu       = 256
     memory    = 256
@@ -121,7 +136,13 @@ resource "aws_ecs_task_definition" "api_gateway" {
       }
     }
     environment = [
-      { name = "PORT", value = "3000" }
+      { name = "PORT", value = "3000" },
+      { name = "DB_HOST", value = aws_db_instance.postgres_db.address },
+      { name = "DB_PORT", value = "5432" },
+      { name = "DB_USERNAME", value = var.db_username },
+      { name = "DB_PASSWORD", value = var.db_password },
+      { name = "REDIS_HOST", value = aws_elasticache_cluster.redis.cache_nodes[0].address },
+      { name = "REDIS_PORT", value = "6379" }
     ]
   }])
 }
@@ -134,12 +155,11 @@ resource "aws_ecs_service" "api_gateway" {
   launch_type     = "EC2"
 
   network_configuration {
-    subnets         = [aws_subnet.private_1.id, aws_subnet.private_2.id]
-    security_groups = [aws_security_group.ecs_sg.id]
+    subnets          = [aws_subnet.private_1.id, aws_subnet.private_2.id]
+    security_groups  = [aws_security_group.ecs_sg.id]
   }
 
   load_balancer {
-    # Cambié app_tg por gateway_tg para que coincida con el nuevo alb.tf
     target_group_arn = aws_lb_target_group.gateway_tg.arn
     container_name   = "api-gateway"
     container_port   = 3000
