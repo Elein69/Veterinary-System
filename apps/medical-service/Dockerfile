@@ -5,8 +5,7 @@ WORKDIR /app
 COPY . .
 
 RUN npm install
-
-RUN npx nest build medical-service
+RUN npx @nestjs/cli build
 
 
 FROM node:18-alpine AS runner

@@ -8,7 +8,7 @@ COPY . .
 RUN npm install
 
 
-RUN npx nest build patient-service
+RUN npx @nestjs/cli build
 
 
 FROM node:18-alpine AS runner
