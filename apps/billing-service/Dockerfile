@@ -6,7 +6,8 @@ COPY . .
 
 RUN npm install
 
-RUN npx @nestjs/cli build
+RUN npx @nestjs/cli build billing-service
+CMD ["node", "dist/apps/billing-service/main.js"]
 
 FROM node:18-alpine AS runner
 WORKDIR /app

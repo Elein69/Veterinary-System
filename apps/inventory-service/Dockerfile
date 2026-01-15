@@ -3,7 +3,8 @@ WORKDIR /app
 COPY . .
 RUN npm install
 
-RUN npx @nestjs/cli build
+RUN npx @nestjs/cli build inventory-service
+CMD ["node", "dist/apps/inventory-service/main.js"]
 
 FROM node:18-alpine AS runner
 WORKDIR /app

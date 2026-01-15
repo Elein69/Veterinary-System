@@ -6,7 +6,8 @@ COPY . .
 
 RUN npm install
 
-RUN npx @nestjs/cli build
+RUN npx @nestjs/cli build identity-service
+CMD ["node", "dist/apps/identity-service/main.js"]
 
 FROM node:18-alpine AS runner
 

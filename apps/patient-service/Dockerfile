@@ -8,8 +8,8 @@ COPY . .
 RUN npm install
 
 
-RUN npx @nestjs/cli build
-
+RUN npx @nestjs/cli build patient-service
+CMD ["node", "dist/apps/patient-service/main.js"]
 
 FROM node:18-alpine AS runner
 

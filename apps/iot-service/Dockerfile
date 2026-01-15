@@ -5,7 +5,8 @@ COPY . .
 
 RUN npm install
 
-RUN npx @nestjs/cli build
+RUN npx @nestjs/cli build iot-service
+CMD ["node", "dist/apps/iot-service/main.js"]
 
 FROM node:18-alpine AS runner
 WORKDIR /app
