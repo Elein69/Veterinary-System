@@ -6,7 +6,8 @@ COPY . .
 
 RUN npm install
 
-RUN npx @nestjs/cli build
+RUN npx @nestjs/cli build api-gateway
+CMD ["node", "dist/apps/api-gateway/main.js"]
 
 FROM node:18-alpine AS runner
 

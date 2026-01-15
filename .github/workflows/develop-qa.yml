@@ -45,11 +45,12 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: qa
         run: |
-          # CAMBIO AQUÍ: Se cambió ./services/ por ./apps/
-          docker build -t $ECR_REGISTRY/vet-${{ matrix.service }}:$IMAGE_TAG ./apps/${{ matrix.service }}
+          # CAMBIO IMPORTANTE:
+          # 1. "-f ./apps/.../Dockerfile" -> Le dice dónde está el archivo de instrucciones.
+          # 2. " ." (el punto al final) -> Le dice que use la RAÍZ del proyecto para buscar archivos (package.json).
+          docker build -t $ECR_REGISTRY/vet-${{ matrix.service }}:$IMAGE_TAG -f ./apps/${{ matrix.service }}/Dockerfile .
           docker push $ECR_REGISTRY/vet-${{ matrix.service }}:$IMAGE_TAG
 
       - name: Update ECS Service
         run: |
-          # Asegúrate que el nombre del cluster sea exacto al de Terraform
           aws ecs update-service --cluster vet-system-qa-cluster --service ${{ matrix.service }} --force-new-deployment
