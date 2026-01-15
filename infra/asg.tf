@@ -39,9 +39,9 @@ resource "aws_launch_template" "app_lt" {
 
 resource "aws_autoscaling_group" "app_asg" {
   name                = "${var.project_name}-asg"
-  desired_capacity    = 2
-  max_size            = 4
-  min_size            = 1
+  desired_capacity    = 6
+  max_size            = 8
+  min_size            = 6
   vpc_zone_identifier = [aws_subnet.private_1.id, aws_subnet.private_2.id]
 
   launch_template {
