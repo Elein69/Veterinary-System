@@ -8,12 +8,12 @@ import { AuditLog } from './entities/audit-log.entity';
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      username: 'postgres',
-      password: 'Veterinaria2026!', // Tu clave de Postgres
-      database: 'veterinary_db',
-      entities: [AuditLog],
+      host: process.env.DB_HOST,
+      port: parseInt(process.env.DB_PORT) || 5432,
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,// Tu clave de Postgres
+      database: process.env.DB_NAME,
+      entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: true, // Esto creará la tabla 'audit_logs' automáticamente
     }),
     TypeOrmModule.forFeature([AuditLog]),
