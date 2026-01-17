@@ -9,7 +9,7 @@ COPY . .
 RUN npm ci
 
 # Build correcto del microservicio
-RUN RUN npm run build 
+RUN npm run build 
 
 ENV NODE_ENV=qa
 
