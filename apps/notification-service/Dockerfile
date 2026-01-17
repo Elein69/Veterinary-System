@@ -9,7 +9,8 @@ COPY . .
 RUN npm ci
 
 # Build correcto del microservicio
-RUN npx turbo run build --filter=notification-service
+RUN npm run build
+
 
 ENV NODE_ENV=qa
 
