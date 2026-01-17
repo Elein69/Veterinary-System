@@ -1,16 +1,18 @@
-# Etapa 1: Builder
-FROM public.ecr.aws/docker/library/node:20-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN npm install
-RUN npx @nestjs/cli build staff-service
+FROM public.ecr.aws/docker/library/node:20-alpine
 
-# Etapa 2: Runner
-FROM public.ecr.aws/docker/library/node:20-alpine AS runner
 WORKDIR /app
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist/apps/staff-service ./dist
+
+# Copiamos todo (QA tolera esto)
+COPY . .
+
+# Instalación reproducible
+RUN npm ci
+
+# Build correcto del microservicio
+RUN npx turbo run build --filter=staff-service
+
+ENV NODE_ENV=qa
 
 EXPOSE 3009
-CMD ["node", "dist/main"]
+
+CMD ["node", "dist/apps/staff-service/main.js"]

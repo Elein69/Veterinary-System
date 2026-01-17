@@ -1,23 +1,18 @@
-# Etapa 1: Builder
-FROM public.ecr.aws/docker/library/node:20-alpine AS builder
+FROM public.ecr.aws/docker/library/node:20-alpine
 
 WORKDIR /app
 
+# Copiamos todo (QA tolera esto)
 COPY . .
 
-RUN npm install
+# Instalación reproducible
+RUN npm ci
 
-RUN npx @nestjs/cli build billing-service
+# Build correcto del microservicio
+RUN npx turbo run build --filter=billing-service
 
-# Etapa 2: Runner (Cambiado a Node 20 para arreglar el error de crypto)
-FROM public.ecr.aws/docker/library/node:20-alpine AS runner
-WORKDIR /app
+ENV NODE_ENV=qa
 
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist/apps/billing-service ./dist
-
-# Puerto para Billing
 EXPOSE 3006
 
-CMD ["node", "dist/main"]
+CMD ["node", "dist/apps/billing-service/main.js"]

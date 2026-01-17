@@ -1,26 +1,18 @@
-# Etapa 1: Builder (Usamos Node 20 del mirror de AWS)
-FROM public.ecr.aws/docker/library/node:20-alpine AS builder
+FROM public.ecr.aws/docker/library/node:20-alpine
 
 WORKDIR /app
 
-# Copiamos todo el monorepositorio
+# Copiamos todo (QA tolera esto)
 COPY . .
 
-# Instalamos y compilamos
-RUN npm install
-RUN npx @nestjs/cli build appointment-service
+# Instalación reproducible
+RUN npm ci
 
-# Etapa 2: Runner (Cambiado a Node 20 para evitar error de crypto)
-FROM public.ecr.aws/docker/library/node:20-alpine AS runner
-WORKDIR /app
+# Build correcto del microservicio
+RUN npx turbo run build --filter=appointment-service
 
-# Copiamos los archivos generados
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist/apps/appointment-service ./dist
+ENV NODE_ENV=qa
 
-# Puerto específico de Appointment Service
 EXPOSE 3005
 
-# Ejecución
-CMD ["node", "dist/main"]
+CMD ["node", "dist/apps/appointment-service/main.js"]

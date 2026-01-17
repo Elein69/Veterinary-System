@@ -1,24 +1,18 @@
-# Etapa 1: Builder
-FROM public.ecr.aws/docker/library/node:20-alpine AS builder
+FROM public.ecr.aws/docker/library/node:20-alpine
 
 WORKDIR /app
 
+# Copiamos todo (QA tolera esto)
 COPY . .
 
-RUN npm install
+# Instalación reproducible
+RUN npm ci
 
-# Construimos el api-gateway
-RUN npx @nestjs/cli build api-gateway
+# Build correcto del microservicio
+RUN npx turbo run build --filter=api-gateway
 
-# Etapa 2: Runner
-FROM public.ecr.aws/docker/library/node:20-alpine AS runner
-WORKDIR /app
+ENV NODE_ENV=qa
 
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist/apps/api-gateway ./dist
-
-# El API Gateway suele usar el puerto 3000 o 8080 (verifica tu ecs.tf)
 EXPOSE 3000
 
-CMD ["node", "dist/main"]
+CMD ["node", "dist/apps/api-gateway/main.js"]

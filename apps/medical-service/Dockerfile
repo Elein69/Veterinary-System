@@ -1,18 +1,18 @@
-# Etapa 1: Builder
-FROM public.ecr.aws/docker/library/node:20-alpine AS builder
+FROM public.ecr.aws/docker/library/node:20-alpine
+
 WORKDIR /app
+
+# Copiamos todo (QA tolera esto)
 COPY . .
-RUN npm install
-RUN npx @nestjs/cli build medical-service
 
-# Etapa 2: Runner (Cambiado de 18 a 20 para consistencia y evitar errores de crypto)
-FROM public.ecr.aws/docker/library/node:20-alpine AS runner
-WORKDIR /app
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist/apps/medical-service ./dist
+# Instalación reproducible
+RUN npm ci
 
-# Puerto para Medical
+# Build correcto del microservicio
+RUN npx turbo run build --filter=medical-service
+
+ENV NODE_ENV=qa
+
 EXPOSE 3003
 
-CMD ["node", "dist/main"]
+CMD ["node", "dist/apps/medical-service/main.js"]

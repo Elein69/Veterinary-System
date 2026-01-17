@@ -1,24 +1,18 @@
-# Etapa 1: Builder
-FROM public.ecr.aws/docker/library/node:20-alpine AS builder
+FROM public.ecr.aws/docker/library/node:20-alpine
 
 WORKDIR /app
 
+# Copiamos todo (QA tolera esto)
 COPY . .
 
-RUN npm install
+# Instalación reproducible
+RUN npm ci
 
-RUN npx @nestjs/cli build identity-service
+# Build correcto del microservicio
+RUN npx turbo run build --filter=identity-service
 
-# Etapa 2: Runner (Cambiado de 18 a 20 para soportar crypto.randomUUID)
-FROM public.ecr.aws/docker/library/node:20-alpine AS runner
+ENV NODE_ENV=qa
 
-WORKDIR /app
-
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist/apps/identity-service ./dist
-
-# Puerto para Identity
 EXPOSE 3001
 
-CMD ["node", "dist/main"]
+CMD ["node", "dist/apps/identity-service/main.js"]
