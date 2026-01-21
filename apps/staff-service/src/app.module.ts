@@ -35,7 +35,7 @@ import { Staff } from './entities/staff.entity';
         name: 'STAFF_KAFKA_CLIENT',
         transport: Transport.KAFKA,
         options: {
-          client: { brokers: ['127.0.0.1:9092'] },
+          client: { brokers: [process.env.KAFKA_BROKER || 'kafka:9092'] },
           consumer: { groupId: 'staff-consumer' },
         },
       },

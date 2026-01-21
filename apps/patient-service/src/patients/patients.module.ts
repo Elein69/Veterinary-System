@@ -19,7 +19,7 @@ import { PatientSchema } from './schemas/patient.schema';
         transport: Transport.KAFKA,
         options: {
           // 👇 CAMBIO: Usamos 127.0.0.1 en lugar de localhost
-          client: { brokers: ['127.0.0.1:9092'] }, 
+          client: { brokers: [process.env.KAFKA_BROKER || 'kafka:9092'] }, 
           consumer: { groupId: 'patient-consumer' },
         },
       },

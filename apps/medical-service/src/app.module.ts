@@ -4,20 +4,22 @@ import { MedicalRecordsModule } from './medical-records/medical-records.module';
 
 @Module({
   imports: [
-    DynamooseModule.forRoot({
-      local: 'http://127.0.0.1:8000', // 👈 Cambia el string por 'true' para activar modo local
-      aws: { 
-        region: 'us-east-1',
-        accessKeyId: 'local',
-        secretAccessKey: 'local',
-      },
-      table: {
-        create: true,
-        prefix: 'vet_',
-        suffix: '-table',
-      },
-      // 👇 Agregamos esta línea para forzar el endpoint de localhost
-    }),
+    DynamooseModule.forRootAsync({
+  useFactory: () => ({
+    aws: {
+      region: process.env.AWS_REGION,
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
+    local: process.env.DYNAMODB_ENDPOINT,
+    table: {
+      create: true,
+      prefix: 'vet_',
+      suffix: '-table',
+    },
+  }),
+})
+,
     MedicalRecordsModule,
   ],
 })

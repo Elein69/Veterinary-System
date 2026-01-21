@@ -10,7 +10,7 @@ async function bootstrap() {
     transport: Transport.KAFKA,
     options: {
       client: {
-        brokers: ['localhost:9092'], // Broker de Kafka
+        brokers: [process.env.KAFKA_BROKER || 'kafka:9092'], // Broker de Kafka
       },
       consumer: {
         groupId: 'billing-consumer-group', // ID único del grupo

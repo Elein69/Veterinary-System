@@ -16,7 +16,7 @@ import { Appointment } from './entities/appointment.entity'; // 👈 Importar En
         name: 'IDENTITY_SERVICE',
         transport: Transport.RMQ,
         options: {
-          urls: ['amqp://localhost:5672'],
+          urls: ['amqp://rabbitmq:5672'],
           queue: 'identity_queue',
           queueOptions: { durable: false },
         },
@@ -27,7 +27,7 @@ import { Appointment } from './entities/appointment.entity'; // 👈 Importar En
         options: {
           client: {
             clientId: 'appointment',
-            brokers: ['localhost:9092'],
+            brokers: ['kafka:9092'],
           },
           consumer: {
             groupId: 'appointment-consumer',

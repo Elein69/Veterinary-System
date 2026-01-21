@@ -24,7 +24,7 @@ import { MedicalRecordSchema } from './entities/medical-record.schema';
         options: {
           client: {
             clientId: 'medical-record',
-            brokers: ['localhost:9092'],
+            brokers: [process.env.KAFKA_BROKER || 'kafka:9092'],
           },
           consumer: {
             groupId: 'medical-producer-group',

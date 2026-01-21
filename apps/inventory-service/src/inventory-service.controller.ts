@@ -24,8 +24,8 @@ export class InventoryServiceController {
         this.inventoryService.reduceStock(productId, quantity);
         console.log(`✅ [INVENTORY] Automatically deducted ${quantity} units of product ID ${productId}`);
       }
-    } catch (error) {
-      console.error(`❌ [INVENTORY] Could not deduct stock: ${error.message}`);
+    } catch (error: any) { // Añade ': any' o haz una validación de tipo
+       console.error(`❌ [INVENTORY] Could not deduct stock: ${error.message}`);
     }
     console.log('----------------------------------------------------');
   }

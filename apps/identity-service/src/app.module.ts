@@ -36,7 +36,7 @@ import Redis from 'ioredis';
       provide: 'REDIS_CLIENT',
       useFactory: (config: ConfigService) => {
         return new Redis({
-          host: config.get('REDIS_HOST') || 'localhost',
+          host: config.get('REDIS_HOST') || 'vet_redis',
           port: config.get('REDIS_PORT') || 6379,
         });
       },

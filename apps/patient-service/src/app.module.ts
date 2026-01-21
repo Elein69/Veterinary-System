@@ -12,15 +12,22 @@ import { PatientsModule } from './patients/patients.module';
     }),
 
     // 2. Conexión a DynamoDB Local (NoSQL)
-    DynamooseModule.forRoot({
-      local: 'http://127.0.0.1:8000', 
-      aws: { region: 'us-east-1' },
-      table: {
-        create: true,
-        prefix: 'vet_',
-        suffix: '-table',
+    DynamooseModule.forRootAsync({
+  useFactory: () => ({
+    aws: {
+      region: process.env.AWS_REGION,
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
+    local: process.env.DYNAMODB_ENDPOINT,
+    table: {
+      create: true,
+      prefix: 'vet_',
+      suffix: '-table',
       },
     }),
+  }),
+
 
     // 3. Módulo de lógica de negocio
     PatientsModule, 

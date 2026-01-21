@@ -1,19 +1,22 @@
-FROM public.ecr.aws/docker/library/node:20-alpine
-
+FROM public.ecr.aws/docker/library/node:20-alpine AS builder
 WORKDIR /app
 
-# Copiamos todo (QA tolera esto)
+# 1. Copiamos la raíz para que vea los Workspaces
 COPY . .
 
-# Instalación reproducible
-RUN npm ci
+# 2. Instalamos con el mapa de versiones limpio
+RUN npm install --legacy-peer-deps
 
-# Build correcto del microservicio
-RUN npm run build
+# 3. Build específico
+RUN npx nest build staff-service
 
+FROM public.ecr.aws/docker/library/node:20-alpine AS runner
+WORKDIR /app
 
-ENV NODE_ENV=qa
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+# Copiamos el build desde la ruta del monorepo
+COPY --from=builder /app/dist/apps/staff-service ./dist
 
-EXPOSE 3009
-
-CMD ["node", "dist/apps/staff-service/main.js"]
+EXPOSE 3001
+CMD ["node", "dist/main.js"]

@@ -12,7 +12,7 @@ async function bootstrap() {
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
     options: {
-      urls: ['amqp://localhost:5672'], // URL de tu contenedor RabbitMQ
+      urls: [process.env.RABBIT_URL || 'amqp://guest:guest@vet_rabbitmq:5672'], // URL de tu contenedor RabbitMQ
       queue: 'identity_queue',         // 👈 Debe coincidir con lo que pusiste en Appointment Service
       queueOptions: {
         durable: false

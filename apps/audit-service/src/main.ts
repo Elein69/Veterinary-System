@@ -16,7 +16,7 @@ async function bootstrap() {
     transport: Transport.KAFKA,
     options: {
       client: {
-        brokers: ['127.0.0.1:9092'],
+        brokers: [process.env.KAFKA_BROKER]
       },
       consumer: {
         groupId: 'audit-consumer-group',
