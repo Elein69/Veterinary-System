@@ -1,43 +1,46 @@
+// apps/identity-service/src/app.module.ts
 import { Module, Global } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './users/users.module';
-import { AuthModule } from './auth/auth.module'; // 👈 Agregamos AuthModule
+import { AuthModule } from './auth/auth.module';
 import Redis from 'ioredis';
 
 @Global()
 @Module({
   imports: [
+    // ConfigModule lee las variables de entorno del sistema (ECS) automáticamente
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: 'apps/identity-service/.env',
+      // En producción/ECS ignorará el archivo si no existe y usará las variables de entorno
+      envFilePath: 'apps/identity-service/.env', 
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
-        host: config.get<string>('DB_HOST'),
+        host: config.get<string>('DB_HOST'), // ✅ Correcto (Viene de Terraform)
         port: config.get<number>('DB_PORT'),
         username: config.get<string>('DB_USERNAME'),
         password: config.get<string>('DB_PASSWORD'),
         database: config.get<string>('DB_NAME'),
         autoLoadEntities: true,
-        synchronize: true,
+        synchronize: true, // ⚠️ En producción real deberías desactivar esto, pero para QA está bien
       }),
     }),
     UsersModule,
-    AuthModule, // 👈 Registramos el módulo de autenticación
+    AuthModule,
   ],
-  controllers: [], // AppController es opcional si ya tienes UsersController
+  controllers: [],
   providers: [
-    // Proveedor Global de Redis
     {
       provide: 'REDIS_CLIENT',
       useFactory: (config: ConfigService) => {
         return new Redis({
-          host: config.get('REDIS_HOST') || 'vet_redis',
-          port: config.get('REDIS_PORT') || 6379,
+          // 🚨 CORRECCIÓN: Quitamos 'vet_redis' y usamos 'localhost' como fallback seguro
+          host: config.get<string>('REDIS_HOST') || 'localhost',
+          port: config.get<number>('REDIS_PORT') || 6379,
         });
       },
       inject: [ConfigService],

@@ -139,6 +139,10 @@ resource "aws_ecs_service" "microservices" {
     container_name   = each.key
     container_port   = each.value
   }
+  depends_on = [
+    aws_lb_listener_rule.microservices_rules,
+    aws_lb_listener.front_end
+  ]
 }
 
 # ==========================================
@@ -201,4 +205,8 @@ resource "aws_ecs_service" "api_gateway" {
     container_name   = "api-gateway"
     container_port   = 3000
   }
+  depends_on = [
+    aws_lb_listener_rule.gateway_rule,
+    aws_lb_listener.front_end
+  ]
 }
