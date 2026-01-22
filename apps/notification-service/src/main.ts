@@ -7,7 +7,7 @@ async function bootstrap() {
   const app = await NestFactory.create(NotificationServiceModule);
   app.enableCors();
 
-  // 📘 Swagger Configuration
+  app.setGlobalPrefix('notification');
   const config = new DocumentBuilder()
     .setTitle('Notification Service')
     .setDescription('Centralized Notification Hub. Listens to Kafka events from all microservices.')

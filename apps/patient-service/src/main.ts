@@ -6,6 +6,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors();
 
+  app.setGlobalPrefix('patient');
   const config = new DocumentBuilder()
     .setTitle('Patient Service')
     .setDescription('Gestión de Pacientes y Dueños')

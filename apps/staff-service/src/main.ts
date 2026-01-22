@@ -17,12 +17,12 @@ async function bootstrap() {
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
     options: {
-      urls: [rabbitUrl], // <--- ✅ AHORA ES DINÁMICO
+      urls: [rabbitUrl], 
       queue: 'staff_queue',
       queueOptions: { durable: false },
     },
   });
-
+app.setGlobalPrefix('staff');
   const config = new DocumentBuilder()
     .setTitle('Staff Service')
     .setVersion('1.0')

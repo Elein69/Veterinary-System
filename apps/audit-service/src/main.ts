@@ -24,7 +24,7 @@ async function bootstrap() {
     },
   });
 
-  // 3. Swagger para poder consultar los logs de auditoría vía Web
+  app.setGlobalPrefix('audit'); 
   const config = new DocumentBuilder()
     .setTitle('Audit & Security Service')
     .setDescription('Historial inmutable de eventos del sistema (Logs en Postgres)')

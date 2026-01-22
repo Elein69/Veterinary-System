@@ -15,7 +15,7 @@ async function bootstrap() {
     },
   });
 
-  // 3. Configuración de Swagger (Para ver que está vivo vía web)
+  app.setGlobalPrefix('iot');
   const config = new DocumentBuilder()
     .setTitle('IoT Service')
     .setDescription('Recibe datos de sensores vía MQTT')

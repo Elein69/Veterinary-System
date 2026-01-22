@@ -22,7 +22,7 @@ async function bootstrap() {
     },
   });
 
-  // Configuración de Swagger
+  app.setGlobalPrefix('inventory');
   const config = new DocumentBuilder()
     .setTitle('Inventory Service')
     .setDescription('Reactive inventory management via Kafka')

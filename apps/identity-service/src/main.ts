@@ -23,6 +23,7 @@ async function bootstrap() {
     },
   });
 
+  app.setGlobalPrefix('identity');
   const config = new DocumentBuilder()
     .setTitle('Identity Service')
     .setDescription('Authentication via HTTP & RabbitMQ')
