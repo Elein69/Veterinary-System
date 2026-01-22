@@ -9,10 +9,15 @@ async function bootstrap() {
   const app = await NestFactory.create(StaffServiceModule);
 
   // 🔌 Conexión a RabbitMQ para validaciones síncronas
+  // 🔌 Conexión a RabbitMQ para validaciones síncronas
+  // 🔌 Conexión a RabbitMQ
+  // Si existe la variable de entorno (AWS), la usa. Si no, usa la local (Tu PC).
+  const rabbitUrl = process.env.RABBITMQ_HOST || 'amqp://guest:guest@localhost:5672';
+
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
     options: {
-      urls: ['amqp://guest:guest@vet_rabbitmq:5672'],
+      urls: [rabbitUrl], // <--- ✅ AHORA ES DINÁMICO
       queue: 'staff_queue',
       queueOptions: { durable: false },
     },
