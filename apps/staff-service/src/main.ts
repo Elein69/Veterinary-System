@@ -8,30 +8,30 @@ async function bootstrap() {
   const logger = new Logger('Staff_Main');
   const app = await NestFactory.create(StaffServiceModule);
 
-  // 🔌 Conexión a RabbitMQ para validaciones síncronas
-  // 🔌 Conexión a RabbitMQ para validaciones síncronas
-  // 🔌 Conexión a RabbitMQ
-  // Si existe la variable de entorno (AWS), la usa. Si no, usa la local (Tu PC).
-  const rabbitUrl = process.env.RABBITMQ_HOST || 'amqp://guest:guest@localhost:5672';
+  app.setGlobalPrefix('staff');
+
+  const rabbitUrl =
+    process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672';
 
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
     options: {
-      urls: [rabbitUrl], 
+      urls: [rabbitUrl],
       queue: 'staff_queue',
       queueOptions: { durable: false },
     },
   });
-app.setGlobalPrefix('staff');
+
   const config = new DocumentBuilder()
     .setTitle('Staff Service')
     .setVersion('1.0')
     .build();
+
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
   await app.startAllMicroservices();
   await app.listen(3009);
-  logger.log('👨‍⚕️ Staff Service conectado a RabbitMQ y puerto 3009');
+
+  logger.log('👨‍⚕️ Staff Service corriendo en /staff y /staff/docs');
 }
-bootstrap();
