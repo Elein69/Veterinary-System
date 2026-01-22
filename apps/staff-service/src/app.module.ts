@@ -5,6 +5,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { StaffServiceController } from './staff-service.controller';
 import { StaffService } from './app.service';
 import { Staff } from './entities/staff.entity';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -41,7 +42,7 @@ import { Staff } from './entities/staff.entity';
       },
     ]),
   ],
-  controllers: [StaffServiceController],
+  controllers: [StaffServiceController, HealthController],
   providers: [StaffService],
 })
 export class StaffServiceModule {}
