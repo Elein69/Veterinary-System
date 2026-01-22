@@ -6,36 +6,57 @@ import { Logger } from '@nestjs/common';
 async function bootstrap() {
   const logger = new Logger('API_GATEWAY');
   const app = await NestFactory.create(AppModule);
+  
+  // Habilitamos CORS para que el frontend no tenga problemas después
   app.enableCors();
 
   // Verifica si estamos en AWS (ALB) o local
+  // Si existe AWS_ALB_URL, significa que Terraform hizo su trabajo
   const isAws = !!process.env.AWS_ALB_URL;
+  const targetUrl = isAws ? process.env.AWS_ALB_URL : 'http://localhost'; 
 
+  // 📋 MAPA DE RUTAS:
+  // incoming: Lo que escribes en el navegador (/api/...)
+  // outgoing: Cómo se llama el servicio realmente en el ALB/Docker (/patient, /staff...)
   const services = [
-    { path: '/auth', target: isAws ? process.env.AWS_ALB_URL : process.env.IDENTITY_SERVICE_URL },
-    { path: '/patients', target: isAws ? process.env.AWS_ALB_URL : process.env.PATIENT_SERVICE_URL },
-    { path: '/medical-records', target: isAws ? process.env.AWS_ALB_URL : process.env.MEDICAL_SERVICE_URL },
-    { path: '/iot', target: isAws ? process.env.AWS_ALB_URL : process.env.IOT_SERVICE_URL },
-    { path: '/appointments', target: isAws ? process.env.AWS_ALB_URL : process.env.APPOINTMENT_SERVICE_URL },
-    { path: '/billing', target: isAws ? process.env.AWS_ALB_URL : process.env.BILLING_SERVICE_URL },
-    { path: '/inventory', target: isAws ? process.env.AWS_ALB_URL : process.env.INVENTORY_SERVICE_URL },
-    { path: '/notifications', target: isAws ? process.env.AWS_ALB_URL : process.env.NOTIFICATION_SERVICE_URL },
-    { path: '/staff', target: isAws ? process.env.AWS_ALB_URL : process.env.STAFF_SERVICE_URL },
-    { path: '/audit', target: isAws ? process.env.AWS_ALB_URL : process.env.AUDIT_SERVICE_URL },
+    // Auth & Identity
+    { incoming: '/api/auth', outgoing: '/identity', target: isAws ? targetUrl : process.env.IDENTITY_SERVICE_URL },
+    
+    // Patient (Ojo: incoming plural -> outgoing singular)
+    { incoming: '/api/patients', outgoing: '/patient', target: isAws ? targetUrl : process.env.PATIENT_SERVICE_URL },
+    
+    // Medical (Ojo: incoming 'medical-records' -> outgoing 'medical')
+    { incoming: '/api/medical-records', outgoing: '/medical', target: isAws ? targetUrl : process.env.MEDICAL_SERVICE_URL },
+    
+    // Appointment (Plural -> Singular)
+    { incoming: '/api/appointments', outgoing: '/appointment', target: isAws ? targetUrl : process.env.APPOINTMENT_SERVICE_URL },
+    
+    // Otros servicios (Mapeo directo 1 a 1, pero quitando /api)
+    { incoming: '/api/iot', outgoing: '/iot', target: isAws ? targetUrl : process.env.IOT_SERVICE_URL },
+    { incoming: '/api/billing', outgoing: '/billing', target: isAws ? targetUrl : process.env.BILLING_SERVICE_URL },
+    { incoming: '/api/inventory', outgoing: '/inventory', target: isAws ? targetUrl : process.env.INVENTORY_SERVICE_URL },
+    { incoming: '/api/notifications', outgoing: '/notification', target: isAws ? targetUrl : process.env.NOTIFICATION_SERVICE_URL },
+    { incoming: '/api/staff', outgoing: '/staff', target: isAws ? targetUrl : process.env.STAFF_SERVICE_URL },
+    { incoming: '/api/audit', outgoing: '/audit', target: isAws ? targetUrl : process.env.AUDIT_SERVICE_URL },
   ];
 
   // Configuramos los proxies
   services.forEach(service => {
-    app.use(service.path, createProxyMiddleware({
+    app.use(service.incoming, createProxyMiddleware({
       target: service.target,
       changeOrigin: true,
-      pathRewrite: { [`^${service.path}`]: service.path },
+      pathRewrite: {
+        // 🪄 LA MAGIA:
+        // Transforma "/api/patients/docs" -> "/patient/docs"
+        [`^${service.incoming}`]: service.outgoing, 
+      },
       on: {
         proxyReq: (proxyReq, req: any) => {
-          logger.log(`🔀 Redirigiendo: ${req.method} ${req.url} -> ${service.target}`);
+          // Log para depurar en CloudWatch
+          logger.log(`🔀 Proxy: ${req.url} -> ${service.target}${service.outgoing}`);
         },
         error: (err, req, res) => {
-          logger.error(`❌ Error en el proxy hacia ${service.target}: ${err.message}`);
+          logger.error(`❌ Falló proxy hacia ${service.target}: ${err.message}`);
         }
       }
     }));
@@ -46,7 +67,8 @@ async function bootstrap() {
 
   console.log('---------------------------------------------------------');
   console.log(`🏰 API GATEWAY PORT: ${port}`);
-  console.log(`🔗 Redirigiendo a ${isAws ? process.env.AWS_ALB_URL : 'microservicios locales'}`);
+  console.log(`🌍 MODO: ${isAws ? 'AWS CLOUD (ALB)' : 'LOCAL'}`);
+  if (isAws) console.log(`🔗 Target ALB: ${targetUrl}`);
   console.log('---------------------------------------------------------');
 }
 bootstrap();

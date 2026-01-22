@@ -7,7 +7,7 @@ resource "aws_ecs_cluster" "main" {
   name = "${var.project_name}-cluster"
 }
 
-# Capacity Provider (Usando las instancias EC2 del Auto Scaling Group)
+# Capacity Provider
 resource "aws_ecs_capacity_provider" "ec2_provider" {
   name = "${var.project_name}-cp"
   auto_scaling_group_provider {
@@ -48,7 +48,7 @@ locals {
   }
 }
 
-# Task Definition Genérica para todos los Microservicios
+# Task Definition Genérica
 resource "aws_ecs_task_definition" "microservices" {
   for_each                 = local.microservices_map
   family                   = each.key
@@ -80,7 +80,7 @@ resource "aws_ecs_task_definition" "microservices" {
       { name = "PORT", value = tostring(each.value) },
       { name = "NODE_ENV", value = "qa" },
       
-      # --- BASE DE DATOS (Postgres) ---
+      # --- BASE DE DATOS ---
       { name = "DB_HOST", value = aws_db_instance.postgres_db.address },
       { name = "DB_PORT", value = "5432" },
       { name = "DB_USERNAME", value = var.db_username },
@@ -92,24 +92,20 @@ resource "aws_ecs_task_definition" "microservices" {
       { name = "REDIS_PORT", value = "6379" },
 
       # --- MENSAJERÍA (Bastion) ---
-      # RabbitMQ
       { 
         name  = "RABBITMQ_HOST" 
         value = "amqp://${var.db_username}:${var.db_password}@${aws_instance.jumpbox.private_ip}:5672" 
       },
-      # Kafka
       { 
         name  = "KAFKA_BROKER" 
         value = "${aws_instance.jumpbox.private_ip}:9092" 
       },
-      # MQTT (Para IoT)
       { 
         name  = "MQTT_HOST" 
         value = aws_instance.jumpbox.private_ip 
       },
 
-      # --- INFLUXDB (Para IoT) ---
-      # Corre en el Bastion puerto 8086
+      # --- INFLUXDB ---
       { name = "INFLUXDB_URL", value = "http://${aws_instance.jumpbox.private_ip}:8086" },
       { name = "INFLUXDB_ORG", value = "vet_org" },
       { name = "INFLUXDB_BUCKET", value = "vet_bucket" },
@@ -118,7 +114,7 @@ resource "aws_ecs_task_definition" "microservices" {
   }])
 }
 
-# Servicio ECS para cada Microservicio
+# Servicio ECS para Microservicios
 resource "aws_ecs_service" "microservices" {
   for_each        = local.microservices_map
   name            = each.key
@@ -132,13 +128,12 @@ resource "aws_ecs_service" "microservices" {
     security_groups  = [aws_security_group.ecs_sg.id]
   }
 
-  # 🔥 CONEXIÓN AL BALANCEADOR (Esto arregla el 503) 🔥
-  # IMPORTANTE: Esto asume que en alb.tf creaste los Target Groups usando un for_each igual.
   load_balancer {
     target_group_arn = aws_lb_target_group.microservices[each.key].arn
     container_name   = each.key
     container_port   = each.value
   }
+  
   depends_on = [
     aws_lb_listener_rule.microservices_rules,
     aws_lb_listener.front_end
@@ -148,6 +143,8 @@ resource "aws_ecs_service" "microservices" {
 # ==========================================
 # 3. API GATEWAY (Configuración Especial)
 # ==========================================
+# infra/ecs.tf (Solo la parte del Task Definition del Gateway)
+
 resource "aws_ecs_task_definition" "api_gateway" {
   family                   = "api-gateway"
   network_mode             = "awsvpc"
@@ -176,14 +173,32 @@ resource "aws_ecs_task_definition" "api_gateway" {
     environment = [
       { name = "PORT", value = "3000" },
       { name = "NODE_ENV", value = "qa" },
+      
+      # Base de Datos y Redis
       { name = "DB_HOST", value = aws_db_instance.postgres_db.address },
       { name = "DB_PORT", value = "5432" },
       { name = "DB_USERNAME", value = var.db_username },
       { name = "DB_PASSWORD", value = var.db_password },
       { name = "REDIS_HOST", value = aws_elasticache_cluster.redis.cache_nodes[0].address },
       { name = "REDIS_PORT", value = "6379" },
-      # URL del Balanceador para que el Gateway encuentre a los servicios
-      # { name = "STAFF_SERVICE_URL", value = "http://${aws_lb.main.dns_name}/staff" } 
+
+      # 🚨 BLINDAJE TOTAL: Definimos TODO apuntando al ALB 🚨
+      
+      # 1. La Variable Maestra (Para tu lógica isAws)
+      { name = "AWS_ALB_URL", value = "http://${aws_lb.app_lb.dns_name}" },
+
+      # 2. Las Variables Individuales (Fallback de seguridad)
+      # Si isAws falla, estas variables salvarán el día.
+      { name = "STAFF_SERVICE_URL",       value = "http://${aws_lb.app_lb.dns_name}/staff" },
+      { name = "PATIENT_SERVICE_URL",     value = "http://${aws_lb.app_lb.dns_name}/patient" },
+      { name = "MEDICAL_SERVICE_URL",     value = "http://${aws_lb.app_lb.dns_name}/medical" },
+      { name = "APPOINTMENT_SERVICE_URL", value = "http://${aws_lb.app_lb.dns_name}/appointment" },
+      { name = "INVENTORY_SERVICE_URL",   value = "http://${aws_lb.app_lb.dns_name}/inventory" },
+      { name = "BILLING_SERVICE_URL",     value = "http://${aws_lb.app_lb.dns_name}/billing" },
+      { name = "NOTIFICATION_SERVICE_URL",value = "http://${aws_lb.app_lb.dns_name}/notification" },
+      { name = "IOT_SERVICE_URL",         value = "http://${aws_lb.app_lb.dns_name}/iot" },
+      { name = "IDENTITY_SERVICE_URL",    value = "http://${aws_lb.app_lb.dns_name}/identity" },
+      { name = "AUDIT_SERVICE_URL",       value = "http://${aws_lb.app_lb.dns_name}/audit" }
     ]
   }])
 }
@@ -205,6 +220,7 @@ resource "aws_ecs_service" "api_gateway" {
     container_name   = "api-gateway"
     container_port   = 3000
   }
+  
   depends_on = [
     aws_lb_listener_rule.gateway_rule,
     aws_lb_listener.front_end
