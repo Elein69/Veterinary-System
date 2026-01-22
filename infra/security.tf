@@ -1,6 +1,8 @@
-# security.tf
+# infra/security.tf
 
-# 1. Load Balancer (Entrada Internet)
+# ==========================================
+# 1. LOAD BALANCER (Puerta al Internet)
+# ==========================================
 resource "aws_security_group" "alb_sg" {
   name        = "${var.project_name}-alb-sg"
   description = "Security Group para el Balanceador de Carga"
@@ -22,14 +24,15 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
-# 2. Bastion / Jumpbox (DEFINICIÓN BASE)
-# Quitamos las reglas que dependen de ECS para romper el ciclo
+# ==========================================
+# 2. BASTION / JUMPBOX / BROKERS (La solución al error)
+# ==========================================
 resource "aws_security_group" "bastion_sg" {
   name        = "${var.project_name}-bastion-sg"
   description = "Security Group para el Servidor Bastion y Brokers"
   vpc_id      = aws_vpc.main.id
 
-  # Reglas que NO dependen de otros grupos (SSH externo e InfluxDB interno por IP)
+  # A. SSH EXTERNO (Para que tú entres a revisar)
   ingress {
     description = "SSH Admin"
     from_port   = 22
@@ -38,12 +41,15 @@ resource "aws_security_group" "bastion_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   
+  # B. REGLA MAESTRA INTERNA (Solución al ETIMEDOUT)
+  # Permitimos TODO el tráfico TCP desde dentro de la VPC (10.0.x.x)
+  # Así entran RabbitMQ (5672), Kafka (9092), MQTT (1883) e InfluxDB (8086) sin problemas.
   ingress {
-    description = "InfluxDB Interno"
-    from_port   = 8086
-    to_port     = 8086
+    description = "Todo el trafico interno desde la VPC"
+    from_port   = 0
+    to_port     = 65535
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = ["10.0.0.0/16"] # <--- ESTO ES LO QUE ARREGLA TODO
   }
 
   egress {
@@ -54,14 +60,15 @@ resource "aws_security_group" "bastion_sg" {
   }
 }
 
-# 3. Nodos ECS (DEFINICIÓN BASE)
-# Quitamos las reglas que dependen de Bastion para romper el ciclo
+# ==========================================
+# 3. NODOS ECS (Microservicios)
+# ==========================================
 resource "aws_security_group" "ecs_sg" {
   name        = "${var.project_name}-ecs-node-sg"
   description = "Security Group para los microservicios"
   vpc_id      = aws_vpc.main.id
 
-  # Tráfico desde el Balanceador (ALB) - Esto no crea ciclo
+  # Tráfico desde el Balanceador (ALB)
   ingress {
     from_port       = 0
     to_port         = 65535
@@ -76,6 +83,14 @@ resource "aws_security_group" "ecs_sg" {
     protocol  = "-1"
     self      = true
   }
+  
+  # Permitir SSH desde el Bastion (opcional, para debug)
+  ingress {
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.bastion_sg.id]
+  }
 
   egress {
     from_port   = 0
@@ -85,12 +100,14 @@ resource "aws_security_group" "ecs_sg" {
   }
 }
 
-# 4. Base de Datos (RDS/Redis)
+# ==========================================
+# 4. BASE DE DATOS (RDS/Redis)
+# ==========================================
 resource "aws_security_group" "db_sg" {
   name        = "${var.project_name}-db-sg"
   vpc_id      = aws_vpc.main.id
 
-  # Regla Postgres
+  # Regla Postgres (Permite ECS y Bastion)
   ingress {
     from_port       = 5432
     to_port         = 5432
@@ -107,29 +124,5 @@ resource "aws_security_group" "db_sg" {
   }
 }
 
-# ==========================================================
-# REGLAS EXTERNAS (PARA ROMPER EL CICLO)
-# Aquí definimos las reglas "conflictivas" después de crear los grupos
-# ==========================================================
-
-# A. Permitir que ECS entre al Bastion (Para Kafka, RabbitMQ, MQTT)
-resource "aws_security_group_rule" "allow_ecs_to_brokers" {
-  type                     = "ingress"
-  from_port                = 0
-  to_port                  = 65535
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.ecs_sg.id
-  security_group_id        = aws_security_group.bastion_sg.id
-  description              = "Permitir ECS acceder a Brokers en Bastion"
-}
-
-# B. Permitir que Bastion entre a ECS (SSH para debug)
-resource "aws_security_group_rule" "allow_bastion_ssh_to_ecs" {
-  type                     = "ingress"
-  from_port                = 22
-  to_port                  = 22
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.bastion_sg.id
-  security_group_id        = aws_security_group.ecs_sg.id
-  description              = "Permitir SSH desde Bastion a ECS"
-}
+# NOTA: HE BORRADO LAS "REGLAS EXTERNAS" DEL FINAL PORQUE YA NO SON NECESARIAS
+# AL USAR "cidr_blocks = 10.0.0.0/16" EN EL BASTION.
