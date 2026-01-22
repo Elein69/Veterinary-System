@@ -11,7 +11,7 @@ async function bootstrap() {
     transport: Transport.MQTT,
     options: {
       // 👇 CAMBIO AQUÍ: Usa 127.0.0.1 en vez de localhost
-      url: process.env.MQTT_BROKER || 'mqtt://vet_mosquitto:1883',
+      url: `mqtt://${process.env.MQTT_HOST || 'localhost'}:1883`,
     },
   });
 

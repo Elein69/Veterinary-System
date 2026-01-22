@@ -1,11 +1,13 @@
-# ecs.tf - ARCHIVO COMPLETO Y CORREGIDO
+# infra/ecs.tf
 
-# 1. Cluster
+# ==========================================
+# 1. CONFIGURACIÓN DEL CLUSTER
+# ==========================================
 resource "aws_ecs_cluster" "main" {
   name = "${var.project_name}-cluster"
 }
 
-# 2. Capacity Provider (EC2)
+# Capacity Provider (Usando las instancias EC2 del Auto Scaling Group)
 resource "aws_ecs_capacity_provider" "ec2_provider" {
   name = "${var.project_name}-cp"
   auto_scaling_group_provider {
@@ -22,13 +24,15 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
   capacity_providers = [aws_ecs_capacity_provider.ec2_provider.name]
 }
 
-# --- LOGS ---
+# Logs en CloudWatch
 resource "aws_cloudwatch_log_group" "ecs_logs" {
   name              = "/ecs/${var.project_name}"
   retention_in_days = 1
 }
 
-# --- LISTA DE MICROSERVICIOS ---
+# ==========================================
+# 2. DEFINICIÓN DE MICROSERVICIOS
+# ==========================================
 locals {
   microservices_map = {
     "identity-service"     = 3001
@@ -44,7 +48,7 @@ locals {
   }
 }
 
-# --- TASK DEFINITIONS PARA MICROSERVICIOS (CORREGIDO CON VARIABLES) ---
+# Task Definition Genérica para todos los Microservicios
 resource "aws_ecs_task_definition" "microservices" {
   for_each                 = local.microservices_map
   family                   = each.key
@@ -72,43 +76,49 @@ resource "aws_ecs_task_definition" "microservices" {
       }
     }
     
-   environment = [
+    environment = [
       { name = "PORT", value = tostring(each.value) },
+      { name = "NODE_ENV", value = "qa" },
       
-      # --- BASE DE DATOS Y REDIS (Correcto) ---
+      # --- BASE DE DATOS (Postgres) ---
       { name = "DB_HOST", value = aws_db_instance.postgres_db.address },
       { name = "DB_PORT", value = "5432" },
       { name = "DB_USERNAME", value = var.db_username },
       { name = "DB_PASSWORD", value = var.db_password },
       { name = "DB_NAME", value = "postgres" },
+      
+      # --- REDIS ---
       { name = "REDIS_HOST", value = aws_elasticache_cluster.redis.cache_nodes[0].address },
       { name = "REDIS_PORT", value = "6379" },
 
-      # --- AQUÍ ESTÁ EL CAMBIO CRÍTICO (APUNTANDO AL BASTION) ---
-      
-      # 1. RabbitMQ: Construimos la URL completa con usuario, clave e IP del Bastion
+      # --- MENSAJERÍA (Bastion) ---
+      # RabbitMQ
       { 
         name  = "RABBITMQ_HOST" 
         value = "amqp://${var.db_username}:${var.db_password}@${aws_instance.jumpbox.private_ip}:5672" 
       },
-
-      # 2. Kafka: IP del Bastion + Puerto 9092
-      # OJO: En tu código NestJS usaste "KAFKA_BROKER" (singular), así que aquí también.
+      # Kafka
       { 
         name  = "KAFKA_BROKER" 
         value = "${aws_instance.jumpbox.private_ip}:9092" 
       },
-
-      # 3. MQTT: Solo la IP del Bastion
+      # MQTT (Para IoT)
       { 
         name  = "MQTT_HOST" 
         value = aws_instance.jumpbox.private_ip 
-      }
+      },
+
+      # --- INFLUXDB (Para IoT) ---
+      # Corre en el Bastion puerto 8086
+      { name = "INFLUXDB_URL", value = "http://${aws_instance.jumpbox.private_ip}:8086" },
+      { name = "INFLUXDB_ORG", value = "vet_org" },
+      { name = "INFLUXDB_BUCKET", value = "vet_bucket" },
+      { name = "INFLUXDB_TOKEN", value = var.influxdb_token }
     ]
   }])
 }
 
-# --- SERVICIOS ECS ---
+# Servicio ECS para cada Microservicio
 resource "aws_ecs_service" "microservices" {
   for_each        = local.microservices_map
   name            = each.key
@@ -121,9 +131,19 @@ resource "aws_ecs_service" "microservices" {
     subnets          = [aws_subnet.private_1.id, aws_subnet.private_2.id]
     security_groups  = [aws_security_group.ecs_sg.id]
   }
+
+  # 🔥 CONEXIÓN AL BALANCEADOR (Esto arregla el 503) 🔥
+  # IMPORTANTE: Esto asume que en alb.tf creaste los Target Groups usando un for_each igual.
+  load_balancer {
+    target_group_arn = aws_lb_target_group.microservices[each.key].arn
+    container_name   = each.key
+    container_port   = each.value
+  }
 }
 
-# --- API GATEWAY (Manejo especial) ---
+# ==========================================
+# 3. API GATEWAY (Configuración Especial)
+# ==========================================
 resource "aws_ecs_task_definition" "api_gateway" {
   family                   = "api-gateway"
   network_mode             = "awsvpc"
@@ -151,12 +171,15 @@ resource "aws_ecs_task_definition" "api_gateway" {
     }
     environment = [
       { name = "PORT", value = "3000" },
+      { name = "NODE_ENV", value = "qa" },
       { name = "DB_HOST", value = aws_db_instance.postgres_db.address },
       { name = "DB_PORT", value = "5432" },
       { name = "DB_USERNAME", value = var.db_username },
       { name = "DB_PASSWORD", value = var.db_password },
       { name = "REDIS_HOST", value = aws_elasticache_cluster.redis.cache_nodes[0].address },
-      { name = "REDIS_PORT", value = "6379" }
+      { name = "REDIS_PORT", value = "6379" },
+      # URL del Balanceador para que el Gateway encuentre a los servicios
+      # { name = "STAFF_SERVICE_URL", value = "http://${aws_lb.main.dns_name}/staff" } 
     ]
   }])
 }

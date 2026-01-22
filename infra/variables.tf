@@ -24,6 +24,12 @@ variable "db_password" {
   sensitive = true
 }
 
+variable "influxdb_token" {
+  description = "Token para conectar a InfluxDB"
+  type        = string
+  default     = "my-super-secret-token"
+}
+
 # Credenciales (se inyectan desde el archivo .tfvars)
 variable "aws_access_key" {}
 variable "aws_secret_key" {}
