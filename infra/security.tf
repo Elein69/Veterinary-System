@@ -1,6 +1,9 @@
+# security.tf
+
 # 1. Load Balancer (Entrada Internet)
 resource "aws_security_group" "alb_sg" {
   name        = "${var.project_name}-alb-sg"
+  description = "Security Group para el Balanceador de Carga"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -19,13 +22,16 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
-# 2. Bastion / Jumpbox (Entrada Admin)
+# 2. Bastion / Jumpbox (DEFINICIÓN BASE)
+# Quitamos las reglas que dependen de ECS para romper el ciclo
 resource "aws_security_group" "bastion_sg" {
   name        = "${var.project_name}-bastion-sg"
+  description = "Security Group para el Servidor Bastion y Brokers"
   vpc_id      = aws_vpc.main.id
 
+  # Reglas que NO dependen de otros grupos (SSH externo e InfluxDB interno por IP)
   ingress {
-    description = "SSH"
+    description = "SSH Admin"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -48,12 +54,14 @@ resource "aws_security_group" "bastion_sg" {
   }
 }
 
-# 3. Nodos ECS (Donde viven tus apps)
+# 3. Nodos ECS (DEFINICIÓN BASE)
+# Quitamos las reglas que dependen de Bastion para romper el ciclo
 resource "aws_security_group" "ecs_sg" {
   name        = "${var.project_name}-ecs-node-sg"
+  description = "Security Group para los microservicios"
   vpc_id      = aws_vpc.main.id
 
-  # Tráfico desde el Balanceador
+  # Tráfico desde el Balanceador (ALB) - Esto no crea ciclo
   ingress {
     from_port       = 0
     to_port         = 65535
@@ -68,14 +76,6 @@ resource "aws_security_group" "ecs_sg" {
     protocol  = "-1"
     self      = true
   }
-  
-  # SSH desde Bastion
-  ingress {
-    from_port       = 22
-    to_port         = 22
-    protocol        = "tcp"
-    security_groups = [aws_security_group.bastion_sg.id]
-  }
 
   egress {
     from_port   = 0
@@ -85,22 +85,51 @@ resource "aws_security_group" "ecs_sg" {
   }
 }
 
-# 4. Bases de Datos
+# 4. Base de Datos (RDS/Redis)
 resource "aws_security_group" "db_sg" {
   name        = "${var.project_name}-db-sg"
   vpc_id      = aws_vpc.main.id
 
+  # Regla Postgres
   ingress {
-    from_port       = 5432 # Postgres
+    from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [aws_security_group.ecs_sg.id, aws_security_group.bastion_sg.id]
   }
 
+  # Regla Redis
   ingress {
-    from_port       = 6379 # Redis
+    from_port       = 6379
     to_port         = 6379
     protocol        = "tcp"
     security_groups = [aws_security_group.ecs_sg.id]
   }
+}
+
+# ==========================================================
+# REGLAS EXTERNAS (PARA ROMPER EL CICLO)
+# Aquí definimos las reglas "conflictivas" después de crear los grupos
+# ==========================================================
+
+# A. Permitir que ECS entre al Bastion (Para Kafka, RabbitMQ, MQTT)
+resource "aws_security_group_rule" "allow_ecs_to_brokers" {
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 65535
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.ecs_sg.id
+  security_group_id        = aws_security_group.bastion_sg.id
+  description              = "Permitir ECS acceder a Brokers en Bastion"
+}
+
+# B. Permitir que Bastion entre a ECS (SSH para debug)
+resource "aws_security_group_rule" "allow_bastion_ssh_to_ecs" {
+  type                     = "ingress"
+  from_port                = 22
+  to_port                  = 22
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.bastion_sg.id
+  security_group_id        = aws_security_group.ecs_sg.id
+  description              = "Permitir SSH desde Bastion a ECS"
 }

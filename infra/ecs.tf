@@ -72,24 +72,38 @@ resource "aws_ecs_task_definition" "microservices" {
       }
     }
     
-    # --- AQUÍ ESTÁN LAS VARIABLES QUE TE FALTABAN ---
-    environment = [
+   environment = [
       { name = "PORT", value = tostring(each.value) },
       
-      # Variables de Base de Datos (Postgres)
+      # --- BASE DE DATOS Y REDIS (Correcto) ---
       { name = "DB_HOST", value = aws_db_instance.postgres_db.address },
       { name = "DB_PORT", value = "5432" },
       { name = "DB_USERNAME", value = var.db_username },
       { name = "DB_PASSWORD", value = var.db_password },
       { name = "DB_NAME", value = "postgres" },
-
-      # Variables de Redis (Cache)
       { name = "REDIS_HOST", value = aws_elasticache_cluster.redis.cache_nodes[0].address },
       { name = "REDIS_PORT", value = "6379" },
 
-      # Placeholders para evitar crashes en IoT/Notification
-      { name = "MQTT_HOST", value = "test.mosquitto.org" },
-      { name = "KAFKA_BROKERS", value = "localhost:9092" }
+      # --- AQUÍ ESTÁ EL CAMBIO CRÍTICO (APUNTANDO AL BASTION) ---
+      
+      # 1. RabbitMQ: Construimos la URL completa con usuario, clave e IP del Bastion
+      { 
+        name  = "RABBITMQ_HOST" 
+        value = "amqp://${var.db_username}:${var.db_password}@${aws_instance.jumpbox.private_ip}:5672" 
+      },
+
+      # 2. Kafka: IP del Bastion + Puerto 9092
+      # OJO: En tu código NestJS usaste "KAFKA_BROKER" (singular), así que aquí también.
+      { 
+        name  = "KAFKA_BROKER" 
+        value = "${aws_instance.jumpbox.private_ip}:9092" 
+      },
+
+      # 3. MQTT: Solo la IP del Bastion
+      { 
+        name  = "MQTT_HOST" 
+        value = aws_instance.jumpbox.private_ip 
+      }
     ]
   }])
 }
