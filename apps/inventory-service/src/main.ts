@@ -8,8 +8,8 @@ async function bootstrap() {
   const logger = new Logger('Inventory_Main');
   const app = await NestFactory.create(InventoryServiceModule);
   app.enableCors();
-
-  // Conexión a Kafka como microservicio
+  app.setGlobalPrefix('inventory');
+ 
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.KAFKA,
     options: {
@@ -22,7 +22,6 @@ async function bootstrap() {
     },
   });
 
-  app.setGlobalPrefix('inventory');
   const config = new DocumentBuilder()
     .setTitle('Inventory Service')
     .setDescription('Reactive inventory management via Kafka')
@@ -30,7 +29,7 @@ async function bootstrap() {
     .addTag('Inventory')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('inventory/docs', app, document);
 
   // Arrancar microservicios y HTTP
   await app.startAllMicroservices();

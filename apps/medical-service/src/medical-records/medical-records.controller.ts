@@ -4,7 +4,7 @@ import { CreateMedicalRecordDto } from './dto/create-medical-record.dto';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('Medical Records')
-@Controller('medical-records')
+@Controller()
 export class MedicalRecordsController {
   constructor(private readonly medicalRecordsService: MedicalRecordsService) {}
 

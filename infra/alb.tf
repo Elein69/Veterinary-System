@@ -41,12 +41,12 @@ resource "aws_lb_target_group" "microservices" {
   target_type = "ip"
 
   health_check {
-    path                = "/docs" 
-    interval            = 45
-    timeout             = 5
+    path                = "/${replace(each.key, "-service", "")}/health" 
+    interval            = 30
+    timeout             = 10
     healthy_threshold   = 2
     unhealthy_threshold = 5
-    matcher             = "200-499" 
+    matcher             = "200" 
   }
 }
 

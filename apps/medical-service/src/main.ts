@@ -6,6 +6,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.setGlobalPrefix('medical');
+  app.enableCors();
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -13,16 +15,13 @@ async function bootstrap() {
     }),
   );
   
-  app.enableCors();
-
-  app.setGlobalPrefix('medical');
   const config = new DocumentBuilder()
     .setTitle('Veterinary Medical Service')
     .setDescription('Microservice for Medical Records management using DynamoDB')
     .setVersion('1.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('medical/docs', app, document);
 
   const port = process.env.PORT || 3003;
   await app.listen(port);

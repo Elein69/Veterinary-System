@@ -8,13 +8,14 @@ async function bootstrap() {
   app.enableCors();
 
   app.setGlobalPrefix('notification');
+  
   const config = new DocumentBuilder()
     .setTitle('Notification Service')
     .setDescription('Centralized Notification Hub. Listens to Kafka events from all microservices.')
     .setVersion('1.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('notification/docs', app, document);
 
   // 📡 Kafka Connection (Haciendo el puente con los otros servicios)
   app.connectMicroservice<MicroserviceOptions>({

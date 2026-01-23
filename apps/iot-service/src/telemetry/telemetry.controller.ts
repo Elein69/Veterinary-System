@@ -4,7 +4,7 @@ import { CreateTelemetryDto } from './dto/create-telemetry.dto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Telemetry (IoT)')
-@Controller('telemetry')
+@Controller()
 export class TelemetryController {
   constructor(private readonly telemetryService: TelemetryService) {}
 

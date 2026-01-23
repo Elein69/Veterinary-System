@@ -6,7 +6,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { EventPattern, Payload } from '@nestjs/microservices';
 
 @ApiTags('Inventory Management')
-@Controller('inventory')
+@Controller()
 export class InventoryServiceController {
   constructor(private readonly inventoryService: InventoryService) {}
 

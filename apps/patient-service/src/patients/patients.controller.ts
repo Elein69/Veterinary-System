@@ -4,7 +4,7 @@ import { CreatePatientDto } from './dto/create-patient.dto';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('Patients')
-@Controller('patients')
+@Controller()
 export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 
