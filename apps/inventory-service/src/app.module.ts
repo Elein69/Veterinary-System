@@ -41,7 +41,7 @@ import { HealthController } from './health.controller';
       },
     ]),
   ],
-  controllers: [InventoryServiceController, HealthController],
+  controllers: [InventoryServiceController, HealthController, ],
   providers: [InventoryService],
 })
 export class InventoryServiceModule {}
