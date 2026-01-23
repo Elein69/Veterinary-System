@@ -9,10 +9,7 @@ async function bootstrap() {
   const app = await NestFactory.create(StaffServiceModule);
   
   app.setGlobalPrefix('staff');
-  // 🔌 Conexión a RabbitMQ para validaciones síncronas
-  // 🔌 Conexión a RabbitMQ para validaciones síncronas
-  // 🔌 Conexión a RabbitMQ
-  // Si existe la variable de entorno (AWS), la usa. Si no, usa la local (Tu PC).
+  
   const rabbitUrl = process.env.RABBITMQ_HOST || 'amqp://guest:guest@localhost:5672';
 
   app.connectMicroservice<MicroserviceOptions>({
@@ -29,7 +26,7 @@ async function bootstrap() {
     .setVersion('1.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('staff/docs', app, document);
 
   await app.startAllMicroservices();
   await app.listen(3009);
