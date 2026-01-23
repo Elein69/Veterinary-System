@@ -1,10 +1,10 @@
-// apps/identity-service/src/app.module.ts
 import { Module, Global } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import Redis from 'ioredis';
+import { HealthController } from './health.controller';
 
 @Global()
 @Module({
@@ -32,7 +32,7 @@ import Redis from 'ioredis';
     UsersModule,
     AuthModule,
   ],
-  controllers: [],
+  controllers: [HealthController,],
   providers: [
     {
       provide: 'REDIS_CLIENT',

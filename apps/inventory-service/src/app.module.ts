@@ -5,6 +5,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { InventoryServiceController } from './inventory-service.controller';
 import { InventoryService } from './app.service';
 import { Product } from './entities/product.entity';
+import { HealthController } from './health.controller';
 
 @Global()
 @Module({
@@ -40,7 +41,7 @@ import { Product } from './entities/product.entity';
       },
     ]),
   ],
-  controllers: [InventoryServiceController],
+  controllers: [InventoryServiceController, HealthController],
   providers: [InventoryService],
 })
 export class InventoryServiceModule {}

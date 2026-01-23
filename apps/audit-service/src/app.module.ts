@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuditLog } from './entities/audit-log.entity';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -30,7 +31,7 @@ import { AuditLog } from './entities/audit-log.entity';
     // Hacemos disponible la entidad AuditLog
     TypeOrmModule.forFeature([AuditLog]),
   ],
-  controllers: [AppController],
+  controllers: [AppController, HealthController],
   providers: [AppService],
 })
 export class AppModule {}

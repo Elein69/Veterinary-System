@@ -2,7 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BillingModule } from './billing/billing.module'; // 👈 Tu nuevo módulo
-// Puedes borrar AppController y AppService si no los usas
+import { HealthController } from './health.controller';
+
 
 @Module({
   imports: [
@@ -31,6 +32,9 @@ import { BillingModule } from './billing/billing.module'; // 👈 Tu nuevo módu
 
     // 3. Módulo Funcional
     BillingModule,
+  ],
+  controllers: [
+    HealthController, // ✅ ahora sí existe
   ],
 })
 export class AppModule {}

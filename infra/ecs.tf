@@ -81,6 +81,9 @@ resource "aws_ecs_task_definition" "microservices" {
     environment = [
       { name = "PORT", value = tostring(each.value) },
       { name = "NODE_ENV", value = "qa" },
+      { name = "AWS_REGION",         value = var.aws_region },
+      { name = "AWS_DEFAULT_REGION", value = var.aws_region },
+
       
       # --- BASE DE DATOS ---
       { name = "DB_HOST", value = aws_db_instance.postgres_db.address },
@@ -124,6 +127,8 @@ resource "aws_ecs_service" "microservices" {
   task_definition = aws_ecs_task_definition.microservices[each.key].arn
   desired_count   = 1
   launch_type     = "EC2"
+
+  health_check_grace_period_seconds = 120
 
   network_configuration {
     subnets          = [aws_subnet.private_1.id, aws_subnet.private_2.id]
@@ -177,6 +182,9 @@ resource "aws_ecs_task_definition" "api_gateway" {
     environment = [
       { name = "PORT", value = "3000" },
       { name = "NODE_ENV", value = "qa" },
+      { name = "AWS_REGION", value = var.aws_region },
+      { name = "AWS_DEFAULT_REGION", value = var.aws_region },
+
       
       # Base de Datos y Redis
       { name = "DB_HOST", value = aws_db_instance.postgres_db.address },

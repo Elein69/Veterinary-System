@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DynamooseModule } from 'nestjs-dynamoose';
 import { PatientsModule } from './patients/patients.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -31,6 +32,9 @@ import { PatientsModule } from './patients/patients.module';
 
     // 3. Módulo de lógica de negocio
     PatientsModule, 
+  ],
+  controllers: [
+    HealthController, // 👈 AQUÍ
   ],
 })
 export class AppModule {}
