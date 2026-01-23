@@ -13,7 +13,7 @@ data "aws_ami" "amazon_linux" {
 # 2. Instancia Bastion (Jumpbox + Brokers)
 resource "aws_instance" "jumpbox" {
   ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = "t3.small" # CAMBIO: Subimos a t3.small para aguantar Kafka+Rabbit
+  instance_type          = "t3.medium" # CAMBIO: Subimos a t3.small para aguantar Kafka+Rabbit
   subnet_id              = aws_subnet.public_1.id
   key_name               = var.key_name
   vpc_security_group_ids = [aws_security_group.bastion_sg.id]
@@ -43,16 +43,16 @@ resource "aws_instance" "jumpbox" {
                 --restart always \
                 -p 9092:9092 \
                 -e KAFKA_NODE_ID=1 \
-                -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT \
-                -e KAFKA_ADVERTISED_LISTENERS=INTERNAL://$${PRIVATE_IP}:9092,EXTERNAL://localhost:9092 \
-                -e KAFKA_LISTENERS=INTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:29092 \
-                -e KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL \
-                -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
                 -e KAFKA_PROCESS_ROLES=broker,controller \
                 -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093 \
+                -e KAFKA_LISTENERS=INTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093 \
+                -e KAFKA_ADVERTISED_LISTENERS=INTERNAL://$(hostname -i):9092 \
+                -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT \
+                -e KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL \
                 -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-                -e KAFKA_HEAP_OPTS="-Xmx400M -Xms400M" \
+                -e KAFKA_HEAP_OPTS="-Xmx512M -Xms512M" \
                 apache/kafka:3.7.0
+
 
               # 2. RABBITMQ (Puerto 5672)
               docker run -d --name rabbitmq \
@@ -74,8 +74,11 @@ resource "aws_instance" "jumpbox" {
                 eclipse-mosquitto
 
               # 4. INFLUXDB (Tu configuración original)
-              docker run -d --name influxdb -p 8086:8086 influxdb:2.7
-
+              docker run -d --name influxdb \
+                --restart always \
+                -p 8086:8086 \
+                -v /var/lib/influxdb2:/var/lib/influxdb2 \
+                influxdb:2.7
               # ==========================================
               # D. TUS SCRIPTS ORIGINALES (Cloudflare & Backups)
               # ==========================================

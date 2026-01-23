@@ -66,6 +66,8 @@ resource "aws_ecs_task_definition" "microservices" {
     cpu       = 256
     memory    = 256
     essential = true
+    stopTimeout= 120
+    
     portMappings = [{ containerPort = each.value }]
     logConfiguration = {
       logDriver = "awslogs"
@@ -135,8 +137,10 @@ resource "aws_ecs_service" "microservices" {
   }
   
   depends_on = [
+    aws_instance.jumpbox,
     aws_lb_listener_rule.microservices_rules,
     aws_lb_listener.front_end
+
   ]
 }
 
@@ -222,6 +226,7 @@ resource "aws_ecs_service" "api_gateway" {
   }
   
   depends_on = [
+    aws_instance.jumpbox,
     aws_lb_listener_rule.gateway_rule,
     aws_lb_listener.front_end
   ]
