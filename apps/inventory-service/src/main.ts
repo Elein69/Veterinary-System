@@ -33,7 +33,7 @@ async function bootstrap() {
 
   // Arrancar microservicios y HTTP
   await app.startAllMicroservices();
-  await app.listen(process.env.PORT || 3007);
+  await app.listen(process.env.PORT || 3007, '0.0.0.0');
 
   logger.log('📦 Inventory Service corriendo en HTTP y escuchando Kafka');
 }
