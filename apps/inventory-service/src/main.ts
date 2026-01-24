@@ -7,34 +7,35 @@ import { Logger } from '@nestjs/common';
 async function bootstrap() {
   const logger = new Logger('Inventory_Main');
   const app = await NestFactory.create(InventoryServiceModule);
-
-  // 1. Configuración de Kafka (Consumer)
+  app.enableCors();
+  app.setGlobalPrefix('inventory');
+ 
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.KAFKA,
     options: {
       client: {
-        brokers: ['localhost:9092'],
+        brokers: [process.env.KAFKA_BROKER || 'kafka:9092'],
       },
       consumer: {
-        groupId: 'inventory-consumer-server', // ID único para este servicio
+        groupId: 'inventory-consumer-server',
       },
     },
   });
 
-  // 2. Swagger para documentación
   const config = new DocumentBuilder()
-    .setTitle('Inventory Service (Senior Edition)')
+    .setTitle('Inventory Service')
     .setDescription('Reactive inventory management via Kafka')
-    .setVersion('2.0')
+    .setVersion('1.0')
     .addTag('Inventory')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('inventory/docs', app, document);
 
-  // 3. Arrancar todo
+  // Arrancar microservicios y HTTP
   await app.startAllMicroservices();
-  await app.listen(3007);
-  
-  logger.log('💊 Inventory Service is running on HTTP:3007 and listening to Kafka');
+  await app.listen(process.env.PORT || 3007, '0.0.0.0');
+
+  logger.log('📦 Inventory Service corriendo en HTTP y escuchando Kafka');
 }
+
 bootstrap();

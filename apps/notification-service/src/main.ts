@@ -7,20 +7,21 @@ async function bootstrap() {
   const app = await NestFactory.create(NotificationServiceModule);
   app.enableCors();
 
-  // 📘 Swagger Configuration
+  app.setGlobalPrefix('notification');
+  
   const config = new DocumentBuilder()
     .setTitle('Notification Service')
     .setDescription('Centralized Notification Hub. Listens to Kafka events from all microservices.')
     .setVersion('1.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('notification/docs', app, document);
 
   // 📡 Kafka Connection (Haciendo el puente con los otros servicios)
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.KAFKA,
     options: {
-      client: { brokers: ['127.0.0.1:9092'] },
+      client: { brokers: [process.env.KAFKA_BROKER || 'kafka:9092'] },
       consumer: { groupId: 'notification-consumer' },
     },
   });

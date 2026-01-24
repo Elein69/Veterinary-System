@@ -5,6 +5,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { StaffServiceController } from './staff-service.controller';
 import { StaffService } from './app.service';
 import { Staff } from './entities/staff.entity';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -35,13 +36,13 @@ import { Staff } from './entities/staff.entity';
         name: 'STAFF_KAFKA_CLIENT',
         transport: Transport.KAFKA,
         options: {
-          client: { brokers: ['127.0.0.1:9092'] },
+          client: { brokers: [process.env.KAFKA_BROKER || 'kafka:9092'] },
           consumer: { groupId: 'staff-consumer' },
         },
       },
     ]),
   ],
-  controllers: [StaffServiceController],
+  controllers: [StaffServiceController, HealthController],
   providers: [StaffService],
 })
 export class StaffServiceModule {}

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppointmentModule } from './appointment/appointment.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -29,6 +30,9 @@ import { AppointmentModule } from './appointment/appointment.module';
 
     // 3. Tu módulo funcional
     AppointmentModule,
+  ],
+  controllers: [
+    HealthController, // ✅ ahora sí existe
   ],
 })
 export class AppModule {}

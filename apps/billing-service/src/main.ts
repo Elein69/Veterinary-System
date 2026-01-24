@@ -5,15 +5,17 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // 👇 Configuración de Kafka (Consumer)
+  app.setGlobalPrefix('billing');
+  app.enableCors();
+  
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.KAFKA,
     options: {
       client: {
-        brokers: ['localhost:9092'], // Broker de Kafka
+        brokers: [process.env.KAFKA_BROKER || 'kafka:9092'], 
       },
       consumer: {
-        groupId: 'billing-consumer-group', // ID único del grupo
+        groupId: 'billing-consumer-group', 
       },
     },
   });

@@ -6,23 +6,24 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors();
+  app.setGlobalPrefix('iot');
 
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.MQTT,
     options: {
-      // 👇 CAMBIO AQUÍ: Usa 127.0.0.1 en vez de localhost
-      url: 'mqtt://127.0.0.1:1883', 
+      
+      url: `mqtt://${process.env.MQTT_HOST || 'localhost'}:1883`,
     },
   });
 
-  // 3. Configuración de Swagger (Para ver que está vivo vía web)
+  
   const config = new DocumentBuilder()
     .setTitle('IoT Service')
     .setDescription('Recibe datos de sensores vía MQTT')
     .setVersion('1.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('iot/docs', app, document);
 
   // 4. Arrancamos todo
   await app.startAllMicroservices();

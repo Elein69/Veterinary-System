@@ -7,12 +7,15 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const logger = new Logger('Staff_Main');
   const app = await NestFactory.create(StaffServiceModule);
+  
+  app.setGlobalPrefix('staff');
+  
+  const rabbitUrl = process.env.RABBITMQ_HOST || 'amqp://guest:guest@localhost:5672';
 
-  // 🔌 Conexión a RabbitMQ para validaciones síncronas
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
     options: {
-      urls: ['amqp://localhost:5672'],
+      urls: [rabbitUrl], 
       queue: 'staff_queue',
       queueOptions: { durable: false },
     },
@@ -23,7 +26,7 @@ async function bootstrap() {
     .setVersion('1.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('staff/docs', app, document);
 
   await app.startAllMicroservices();
   await app.listen(3009);

@@ -1,4 +1,5 @@
-# Imagen Amazon Linux 2 optimizada para ECS
+# asg.tf
+
 data "aws_ami" "ecs_optimized" {
   most_recent = true
   owners      = ["amazon"]
@@ -11,11 +12,12 @@ data "aws_ami" "ecs_optimized" {
 resource "aws_launch_template" "app_lt" {
   name_prefix   = "${var.project_name}-lt-"
   image_id      = data.aws_ami.ecs_optimized.id
-  instance_type = "t3.medium" # Potencia suficiente para 11 contenedores
+  instance_type = "t3.medium"
   key_name      = var.key_name
 
+  # USAMOS EL PERFIL DE IAM DE ACADEMY
   iam_instance_profile {
-    name = aws_iam_instance_profile.ecs_agent.name
+    name = data.aws_iam_instance_profile.lab_profile.name 
   }
 
   network_interfaces {
@@ -23,7 +25,6 @@ resource "aws_launch_template" "app_lt" {
     security_groups             = [aws_security_group.ecs_sg.id]
   }
 
-  # Script mágico: Une la EC2 al Cluster
   user_data = base64encode(<<-EOF
               #!/bin/bash
               echo "ECS_CLUSTER=${var.project_name}-cluster" >> /etc/ecs/ecs.config
@@ -38,9 +39,9 @@ resource "aws_launch_template" "app_lt" {
 
 resource "aws_autoscaling_group" "app_asg" {
   name                = "${var.project_name}-asg"
-  desired_capacity    = 2
-  max_size            = 4
-  min_size            = 1
+  desired_capacity    = 8
+  max_size            = 10
+  min_size            = 8
   vpc_zone_identifier = [aws_subnet.private_1.id, aws_subnet.private_2.id]
 
   launch_template {

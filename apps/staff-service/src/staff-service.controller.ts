@@ -5,7 +5,7 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CreateStaffDto } from './dto/create-staff.dto';
 
 @ApiTags('Medical Staff Management')
-@Controller('staff')
+@Controller()
 export class StaffServiceController {
   private readonly logger = new Logger(StaffServiceController.name);
 

@@ -3,10 +3,11 @@ name: Build & Publish Docker Images
 on:
   push:
     branches:
-      - develop  # Generará tag: qa
-      - main     # Generará tag: latest
+      - develop  # Flujo QA
+      - main     # Flujo Producción
 
 jobs:
+  # 1. CONSTRUCCIÓN Y SUBIDA (Igual que siempre)
   push_to_registry:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
@@ -53,3 +54,72 @@ jobs:
           file: ./apps/${{ matrix.service }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+
+  # 2. DESPLIEGUE INTELIGENTE (QA O PROD)
+  deploy-to-aws:
+    needs: push_to_registry
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      # --- LÓGICA PARA ELEGIR AMBIENTE ---
+      - name: Configurar Variables de Ambiente
+        id: config-env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "ENV_NAME=PROD" >> $GITHUB_ENV
+            echo "CLUSTER_NAME=vet-system-prod-cluster" >> $GITHUB_ENV
+          else
+            echo "ENV_NAME=QA" >> $GITHUB_ENV
+            echo "CLUSTER_NAME=vet-system-qa-cluster" >> $GITHUB_ENV
+          fi
+
+      # --- CONFIGURAR AWS (QA) ---
+      - name: Configurar Credenciales AWS (QA)
+        if: env.ENV_NAME == 'QA'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_QA }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_QA }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN_QA }}
+          aws-region: "us-east-1"
+
+      # --- CONFIGURAR AWS (PROD) ---
+      - name: Configurar Credenciales AWS (PROD)
+        if: env.ENV_NAME == 'PROD'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN_PROD }}
+          aws-region: "us-east-1"
+
+      # --- DESPLIEGUE FINAL ---
+      - name: Forzar Actualización en ECS
+        run: |
+          echo "🚀 Desplegando en ambiente: $ENV_NAME"
+          echo "🎯 Clúster destino: $CLUSTER_NAME"
+          
+          SERVICES=(
+            "staff-service"
+            "identity-service"
+            "patient-service"
+            "medical-service"
+            "billing-service"
+            "inventory-service"
+            "appointment-service"
+            "notification-service"
+            "iot-service"
+            "audit-service"
+            "api-gateway"
+          )
+          
+          for SERVICE in "${SERVICES[@]}"; do
+            echo "🔄 Actualizando servicio: $SERVICE..."
+            aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE --force-new-deployment > /dev/null
+          done
+          
+          echo "✅ ¡Despliegue completado exitosamente en $ENV_NAME!"

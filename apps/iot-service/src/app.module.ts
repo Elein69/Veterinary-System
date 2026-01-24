@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config'; // <--- Importante
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TelemetryModule } from './telemetry/telemetry.module'; // Tu módulo de telemetría
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { TelemetryModule } from './telemetry/telemetry.module'; // Tu módulo de
     }),
     TelemetryModule, 
   ],
-  controllers: [AppController],
+  controllers: [AppController, HealthController, ],
   providers: [AppService],
 })
 export class AppModule {}

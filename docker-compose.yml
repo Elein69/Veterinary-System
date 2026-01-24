@@ -1,12 +1,10 @@
-
+version: '3.9'
 
 services:
   # ----------------------------------------
   # DATABASES LAYER
   # ----------------------------------------
-  
-  # 1. SQL Database (Target: Patient, Staff, Inventory, Billing Services)
-  # In AWS Prod: This can be replaced by AWS RDS
+
   postgres:
     image: postgres:15-alpine
     container_name: vet_postgres
@@ -21,13 +19,10 @@ services:
     networks:
       - vet_network
 
-  # 2. NoSQL Database (Target: Medical Records)
-  # In AWS Prod: This connects directly to AWS DynamoDB Service
-
   dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: vet_dynamodb
     command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
-    image: "amazon/dynamodb-local:latest"
-    container_name: vet_dynamodb  # <--- Este es el nombre real
     ports:
       - "8000:8000"
     volumes:
@@ -42,7 +37,6 @@ services:
     ports:
       - "8001:8001"
     environment:
-      # 👇 CAMBIO: Usamos el nombre del container_name y añadimos la región local
       DYNAMO_ENDPOINT: "http://vet_dynamodb:8000"
       AWS_REGION: "us-east-1"
       AWS_ACCESS_KEY_ID: "local"
@@ -52,8 +46,6 @@ services:
     networks:
       - vet_network
 
-  # 3. Time Series Database (Target: IoT Telemetry)
-  # Hosted in Docker (EC2) for both Local and AWS
   influxdb:
     image: influxdb:2.7
     container_name: vet_influxdb
@@ -63,17 +55,15 @@ services:
       - influxdb_data:/var/lib/influxdb2
       - influxdb_config:/etc/influxdb2
     environment:
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=admin
-      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword
-      - DOCKER_INFLUXDB_INIT_ORG=veterinaria_org
-      - DOCKER_INFLUXDB_INIT_BUCKET=telemetry
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: adminpassword
+      DOCKER_INFLUXDB_INIT_ORG: veterinaria_org
+      DOCKER_INFLUXDB_INIT_BUCKET: telemetry
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: my-super-secret-auth-token
     networks:
       - vet_network
 
-  # 4. Cache Database (Target: Identity Service)
-  # In AWS Prod: Can be replaced by ElastiCache or kept in Docker
   redis:
     image: redis:alpine
     container_name: vet_redis
@@ -82,39 +72,31 @@ services:
     networks:
       - vet_network
 
-  # ----------------------------------------
-  # MESSAGE BROKERS LAYER
-  # ----------------------------------------
-
-  # 5. RabbitMQ (Target: RPC Communication Staff <-> Appointment)
   rabbitmq:
     image: rabbitmq:3-management
     container_name: vet_rabbitmq
     ports:
-      - "5672:5672"   # App Connection
-      - "15672:15672" # Management UI
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     networks:
       - vet_network
 
-  # 6. MQTT Broker (Target: IoT Sensors)
   mosquitto:
     image: eclipse-mosquitto
     container_name: vet_mosquitto
     ports:
-      - "1883:1883" # MQTT Port
-      - "9001:9001" # Websockets
+      - "1883:1883"
+      - "9001:9001"
     volumes:
-      # REQUIRED: You must create ./mosquitto/mosquitto.conf locally
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
     networks:
       - vet_network
 
-  # 7. Kafka Cluster (Target: Billing, Notification, Audit)
   zookeeper:
     image: wurstmeister/zookeeper
     container_name: vet_zookeeper
@@ -129,18 +111,194 @@ services:
     ports:
       - "9092:9092"
     environment:
-      # 👇 CAMBIO CRÍTICO: Forzamos a que Kafka se anuncie en la IP de bucle
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://127.0.0.1:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      # Mantenemos tus tópicos
       KAFKA_CREATE_TOPICS: "crear_factura:1:1,staff_status_changed:1:1,inventory_reduced:1:1,patient_created:1:1"
     depends_on:
       - zookeeper
     networks:
       - vet_network
 
-# Persistent Volumes
+  # ----------------------------------------
+  # MICROSERVICES LAYER
+  # ----------------------------------------
+
+  identity-service:
+    build:
+      context: .
+      dockerfile: apps/identity-service/Dockerfile
+    container_name: identity-service
+    env_file:
+      - apps/identity-service/.env
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - vet_network
+
+  patient-service:
+    build:
+      context: .
+      dockerfile: apps/patient-service/Dockerfile
+    container_name: patient-service
+    ports:
+      - "3002:3002"
+    env_file:
+      - apps/patient-service/.env
+    depends_on:
+      - dynamodb-local
+      - kafka
+    networks:
+      - vet_network
+
+  medical-service:
+    build:
+      context: .
+      dockerfile: apps/medical-service/Dockerfile
+    container_name: medical-service
+    ports:
+      - "3003:3003"
+    env_file:
+      - apps/medical-service/.env
+    depends_on:
+      - dynamodb-local
+      - kafka
+    networks:
+      - vet_network
+
+  iot-service:
+    build:
+      context: .
+      dockerfile: apps/iot-service/Dockerfile
+    container_name: iot-service
+    ports:
+      - "3004:3004"
+    env_file:
+      - apps/iot-service/.env
+    depends_on:
+      - influxdb
+      - mosquitto
+    networks:
+      - vet_network
+
+  appointment-service:
+    build:
+      context: .
+      dockerfile: apps/appointment-service/Dockerfile
+    container_name: appointment-service
+    ports:
+      - "3005:3005"
+    env_file:
+      - apps/appointment-service/.env
+    depends_on:
+      - postgres
+      - rabbitmq
+      - kafka
+    networks:
+      - vet_network
+
+  billing-service:
+    build:
+      context: .
+      dockerfile: apps/billing-service/Dockerfile
+    container_name: billing-service
+    ports:
+      - "3006:3006"
+    env_file:
+      - apps/billing-service/.env
+    depends_on:
+      - postgres
+      - kafka
+    networks:
+      - vet_network
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: apps/inventory-service/Dockerfile
+    container_name: inventory-service
+    ports:
+      - "3007:3007"
+    env_file:
+      - apps/inventory-service/.env
+    depends_on:
+      - postgres
+      - kafka
+    networks:
+      - vet_network
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: apps/notification-service/Dockerfile
+    container_name: notification-service
+    ports:
+      - "3008:3008"
+    env_file:
+      - apps/notification-service/.env
+    depends_on:
+      - kafka
+    networks:
+      - vet_network
+
+  staff-service:
+    build:
+      context: .
+      dockerfile: apps/staff-service/Dockerfile
+    container_name: staff-service
+    ports:
+      - "3009:3009"
+    env_file:
+      - apps/staff-service/.env
+    depends_on:
+      - postgres
+      - rabbitmq
+      - kafka
+    networks:
+      - vet_network
+
+  audit-service:
+    build:
+      context: .
+      dockerfile: apps/audit-service/Dockerfile
+    container_name: audit-service
+    ports:
+      - "3010:3010"
+    env_file:
+      - apps/audit-service/.env
+    depends_on:
+      - postgres
+      - kafka
+    networks:
+      - vet_network
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "3000:3000"
+    env_file:
+      - apps/api-gateway/.env
+    depends_on:
+      - identity-service
+      - patient-service
+      - medical-service
+      - iot-service
+      - appointment-service
+      - billing-service
+      - inventory-service
+      - notification-service
+      - staff-service
+      - audit-service
+    networks:
+      - vet_network
+
 volumes:
   postgres_data:
   influxdb_data:
@@ -148,7 +306,6 @@ volumes:
   mosquitto_data:
   mosquitto_log:
 
-# Internal Network
 networks:
   vet_network:
     driver: bridge

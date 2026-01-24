@@ -1,15 +1,19 @@
-# 1. Cluster
+# infra/ecs.tf
+
+# ==========================================
+# 1. CONFIGURACIÓN DEL CLUSTER
+# ==========================================
 resource "aws_ecs_cluster" "main" {
   name = "${var.project_name}-cluster"
 }
 
-# 2. Capacity Provider
+# Capacity Provider
 resource "aws_ecs_capacity_provider" "ec2_provider" {
   name = "${var.project_name}-cp"
   auto_scaling_group_provider {
     auto_scaling_group_arn = aws_autoscaling_group.app_asg.arn
     managed_scaling {
-      status = "ENABLED"
+      status          = "ENABLED"
       target_capacity = 90
     }
   }
@@ -20,21 +24,17 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
   capacity_providers = [aws_ecs_capacity_provider.ec2_provider.name]
 }
 
-# 3. DNS Interno (.local)
-resource "aws_service_discovery_private_dns_namespace" "internal" {
-  name        = "local"
-  description = "DNS Interno Microservicios"
-  vpc         = aws_vpc.main.id
-}
-
+# Logs en CloudWatch
 resource "aws_cloudwatch_log_group" "ecs_logs" {
-  name = "/ecs/${var.project_name}"
+  name              = "/ecs/${var.project_name}"
   retention_in_days = 1
 }
 
-# --- LISTA DE LOS 10 MICROSERVICIOS INTERNOS ---
+# ==========================================
+# 2. DEFINICIÓN DE MICROSERVICIOS
+# ==========================================
 locals {
-  services = {
+  microservices_map = {
     "identity-service"     = 3001
     "patient-service"      = 3002
     "medical-service"      = 3003
@@ -48,102 +48,169 @@ locals {
   }
 }
 
-resource "aws_service_discovery_service" "microservices" {
-  for_each = local.services
-  name     = each.key
-  dns_config {
-    namespace_id = aws_service_discovery_private_dns_namespace.internal.id
-    dns_records {
-      ttl  = 10
-      type = "A"
-    }
-  }
-}
-
+# Task Definition Genérica
 resource "aws_ecs_task_definition" "microservices" {
-  for_each              = local.services
-  family                = each.key
-  network_mode          = "awsvpc"
+  for_each                 = local.microservices_map
+  family                   = each.key
+  network_mode             = "awsvpc"
   requires_compatibilities = ["EC2"]
-  cpu                   = 256
-  memory                = 256
-  execution_role_arn    = aws_iam_role.ecs_execution_role.arn
+  cpu                      = 256
+  memory                   = 256
+  
+  execution_role_arn = data.aws_iam_role.lab_role.arn
+  task_role_arn      = data.aws_iam_role.lab_role.arn
 
   container_definitions = jsonencode([{
     name      = each.key
-    image     = "docker.io/${var.docker_username}/${each.key}:qa"
+    image     = "${aws_ecr_repository.microservices[each.key].repository_url}:qa"
     cpu       = 256
     memory    = 256
     essential = true
+    stopTimeout= 120
+    
     portMappings = [{ containerPort = each.value }]
     logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.ecs_logs.name
-          "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = each.key
-        }
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.ecs_logs.name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = each.key
+      }
     }
+    
     environment = [
-       { name = "PORT", value = tostring(each.value) }
+      { name = "PORT", value = tostring(each.value) },
+      { name = "NODE_ENV", value = "qa" },
+      { name = "AWS_REGION",         value = var.aws_region },
+      { name = "AWS_DEFAULT_REGION", value = var.aws_region },
+
+      
+      # --- BASE DE DATOS ---
+      { name = "DB_HOST", value = aws_db_instance.postgres_db.address },
+      { name = "DB_PORT", value = "5432" },
+      { name = "DB_USERNAME", value = var.db_username },
+      { name = "DB_PASSWORD", value = var.db_password },
+      { name = "DB_NAME", value = "postgres" },
+      
+      # --- REDIS ---
+      { name = "REDIS_HOST", value = aws_elasticache_cluster.redis.cache_nodes[0].address },
+      { name = "REDIS_PORT", value = "6379" },
+
+      # --- MENSAJERÍA (Bastion) ---
+      { 
+        name  = "RABBITMQ_HOST" 
+        value = "amqp://${var.db_username}:${var.db_password}@${aws_instance.jumpbox.private_ip}:5672" 
+      },
+      { 
+        name  = "KAFKA_BROKER" 
+        value = "${aws_instance.jumpbox.private_ip}:9092" 
+      },
+      { 
+        name  = "MQTT_HOST" 
+        value = aws_instance.jumpbox.private_ip 
+      },
+
+      # --- INFLUXDB ---
+      { name = "INFLUXDB_URL", value = "http://${aws_instance.jumpbox.private_ip}:8086" },
+      { name = "INFLUXDB_ORG", value = "vet_org" },
+      { name = "INFLUXDB_BUCKET", value = "vet_bucket" },
+      { name = "INFLUXDB_TOKEN", value = var.influxdb_token }
     ]
   }])
 }
 
+# Servicio ECS para Microservicios
 resource "aws_ecs_service" "microservices" {
-  for_each        = local.services
+  for_each        = local.microservices_map
   name            = each.key
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.microservices[each.key].arn
   desired_count   = 1
   launch_type     = "EC2"
 
+  health_check_grace_period_seconds = 120
+
   network_configuration {
-    subnets         = [aws_subnet.private_1.id, aws_subnet.private_2.id]
-    security_groups = [aws_security_group.ecs_sg.id]
+    subnets          = [aws_subnet.private_1.id, aws_subnet.private_2.id]
+    security_groups  = [aws_security_group.ecs_sg.id]
   }
 
-  service_registries {
-    registry_arn = aws_service_discovery_service.microservices[each.key].arn
+  load_balancer {
+    target_group_arn = aws_lb_target_group.microservices[each.key].arn
+    container_name   = each.key
+    container_port   = each.value
   }
+  
+  depends_on = [
+    aws_instance.jumpbox,
+    aws_lb_listener_rule.microservices_rules,
+    aws_lb_listener.front_end
+
+  ]
 }
 
-# --- API GATEWAY (Público) ---
+# ==========================================
+# 3. API GATEWAY (Configuración Especial)
+# ==========================================
+# infra/ecs.tf (Solo la parte del Task Definition del Gateway)
+
 resource "aws_ecs_task_definition" "api_gateway" {
-  family                = "api-gateway"
-  network_mode          = "awsvpc"
+  family                   = "api-gateway"
+  network_mode             = "awsvpc"
   requires_compatibilities = ["EC2"]
-  cpu                   = 256
-  memory                = 256
-  execution_role_arn    = aws_iam_role.ecs_execution_role.arn
+  cpu                      = 256
+  memory                   = 256
+  
+  execution_role_arn = data.aws_iam_role.lab_role.arn
+  task_role_arn      = data.aws_iam_role.lab_role.arn
 
   container_definitions = jsonencode([{
     name      = "api-gateway"
-    image     = "docker.io/${var.docker_username}/api-gateway:qa"
+    image     = "${aws_ecr_repository.microservices["api-gateway"].repository_url}:qa"
     cpu       = 256
     memory    = 256
     essential = true
     portMappings = [{ containerPort = 3000 }]
     logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.ecs_logs.name
-          "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "api-gateway"
-        }
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.ecs_logs.name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "api-gateway"
+      }
     }
     environment = [
       { name = "PORT", value = "3000" },
-      { name = "PATIENT_SERVICE_URL", value = "http://patient-service.local:3002" },
-      { name = "STAFF_SERVICE_URL", value = "http://staff-service.local:3009" },
-      { name = "IDENTITY_SERVICE_URL", value = "http://identity-service.local:3001" },
-      { name = "MEDICAL_SERVICE_URL", value = "http://medical-service.local:3003" },
-      { name = "IOT_SERVICE_URL", value = "http://iot-service.local:3004" },
-      { name = "APPOINTMENT_SERVICE_URL", value = "http://appointment-service.local:3005" },
-      { name = "BILLING_SERVICE_URL", value = "http://billing-service.local:3006" },
-      { name = "INVENTORY_SERVICE_URL", value = "http://inventory-service.local:3007" },
-      { name = "NOTIFICATION_SERVICE_URL", value = "http://notification-service.local:3008" },
-      { name = "AUDIT_SERVICE_URL", value = "http://audit-service.local:3010" }
+      { name = "NODE_ENV", value = "qa" },
+      { name = "AWS_REGION", value = var.aws_region },
+      { name = "AWS_DEFAULT_REGION", value = var.aws_region },
+
+      
+      # Base de Datos y Redis
+      { name = "DB_HOST", value = aws_db_instance.postgres_db.address },
+      { name = "DB_PORT", value = "5432" },
+      { name = "DB_USERNAME", value = var.db_username },
+      { name = "DB_PASSWORD", value = var.db_password },
+      { name = "REDIS_HOST", value = aws_elasticache_cluster.redis.cache_nodes[0].address },
+      { name = "REDIS_PORT", value = "6379" },
+
+      # 🚨 BLINDAJE TOTAL: Definimos TODO apuntando al ALB 🚨
+      
+      # 1. La Variable Maestra (Para tu lógica isAws)
+      { name = "AWS_ALB_URL", value = "http://${aws_lb.app_lb.dns_name}" },
+
+      # 2. Las Variables Individuales (Fallback de seguridad)
+      # Si isAws falla, estas variables salvarán el día.
+      { name = "STAFF_SERVICE_URL",       value = "http://${aws_lb.app_lb.dns_name}/staff" },
+      { name = "PATIENT_SERVICE_URL",     value = "http://${aws_lb.app_lb.dns_name}/patient" },
+      { name = "MEDICAL_SERVICE_URL",     value = "http://${aws_lb.app_lb.dns_name}/medical" },
+      { name = "APPOINTMENT_SERVICE_URL", value = "http://${aws_lb.app_lb.dns_name}/appointment" },
+      { name = "INVENTORY_SERVICE_URL",   value = "http://${aws_lb.app_lb.dns_name}/inventory" },
+      { name = "BILLING_SERVICE_URL",     value = "http://${aws_lb.app_lb.dns_name}/billing" },
+      { name = "NOTIFICATION_SERVICE_URL",value = "http://${aws_lb.app_lb.dns_name}/notification" },
+      { name = "IOT_SERVICE_URL",         value = "http://${aws_lb.app_lb.dns_name}/iot" },
+      { name = "IDENTITY_SERVICE_URL",    value = "http://${aws_lb.app_lb.dns_name}/identity" },
+      { name = "AUDIT_SERVICE_URL",       value = "http://${aws_lb.app_lb.dns_name}/audit" }
     ]
   }])
 }
@@ -156,13 +223,19 @@ resource "aws_ecs_service" "api_gateway" {
   launch_type     = "EC2"
 
   network_configuration {
-    subnets         = [aws_subnet.private_1.id, aws_subnet.private_2.id]
-    security_groups = [aws_security_group.ecs_sg.id]
+    subnets          = [aws_subnet.private_1.id, aws_subnet.private_2.id]
+    security_groups  = [aws_security_group.ecs_sg.id]
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.app_tg.arn
+    target_group_arn = aws_lb_target_group.gateway_tg.arn
     container_name   = "api-gateway"
     container_port   = 3000
   }
+  
+  depends_on = [
+    aws_instance.jumpbox,
+    aws_lb_listener_rule.gateway_rule,
+    aws_lb_listener.front_end
+  ]
 }

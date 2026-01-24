@@ -1,17 +1,24 @@
-FROM node:18-alpine AS builder
+FROM public.ecr.aws/docker/library/node:20-alpine AS builder
+WORKDIR /repo
 
-WORKDIR /app
-
-COPY . .
+COPY package*.json ./
+COPY turbo.json ./
+COPY tsconfig*.json ./
+COPY apps ./apps
 
 RUN npm install
 
-RUN npx nest build audit-service
+RUN npx turbo run build --filter=audit-service
 
-FROM node:18-alpine AS runner
+FROM public.ecr.aws/docker/library/node:20-alpine
+
 WORKDIR /app
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist/apps/audit-service ./dist
+
+COPY --from=builder /repo/dist/apps/audit-service ./dist
+COPY --from=builder /repo/apps/audit-service/package.json ./
+COPY --from=builder /repo/node_modules ./node_modules
+
+ENV NODE_ENV=qa
 EXPOSE 3010
-CMD ["node", "dist/main"]
+CMD ["node", "dist/main.js"]
+
